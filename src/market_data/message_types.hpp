@@ -33,7 +33,10 @@ enum class InstrumentType : uint8_t {
     EQUITY = 1,
     DERIVATIVE = 2,
     COMMODITY = 3,
-    CURRENCY = 4
+    CURRENCY = 4,
+    INDEX = 5,
+    FUTURE = 6,
+    OPTION = 7
 };
 
 // Base message header for all market data

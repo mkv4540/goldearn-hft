@@ -3,7 +3,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
-#include "../utils/logger.hpp"
+#include "../utils/simple_logger.hpp"
 #include "../market_data/nse_protocol.hpp"
 #include "../market_data/order_book.hpp"
 #include "../core/latency_tracker.hpp"

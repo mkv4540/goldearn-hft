@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <sstream>
+#include <type_traits>
 
 namespace goldearn::utils {
 
@@ -37,11 +38,21 @@ public:
              int line = __builtin_LINE(),
              const char* function = __builtin_FUNCTION());
     
-    template<typename... Args>
-    void log_formatted(LogLevel level, const std::string& format, Args&&... args,
+    // Overload for when no arguments are provided
+    void log_formatted(LogLevel level, const std::string& format,
                       const char* file = __builtin_FILE(),
                       int line = __builtin_LINE(), 
                       const char* function = __builtin_FUNCTION()) {
+        if (level < log_level_.load()) return;
+        log(level, format, file, line, function);
+    }
+    
+    template<typename... Args>
+    typename std::enable_if<sizeof...(Args) != 0, void>::type
+    log_formatted(LogLevel level, const std::string& format, Args&&... args,
+                  const char* file = __builtin_FILE(),
+                  int line = __builtin_LINE(), 
+                  const char* function = __builtin_FUNCTION()) {
         if (level < log_level_.load()) return;
         
         try {
@@ -75,6 +86,11 @@ private:
     std::atomic<uint64_t> messages_logged_{0};
     std::atomic<uint64_t> messages_dropped_{0};
     
+    // Base case for no arguments
+    std::string format_string(const std::string& format) {
+        return format;
+    }
+    
     template<typename T>
     std::string format_string(const std::string& format, T&& value) {
         // Simple format replacement for {}
@@ -82,7 +98,7 @@ private:
         size_t pos = result.find("{}");
         if (pos != std::string::npos) {
             std::ostringstream oss;
-            oss << value;
+            oss << std::forward<T>(value);
             result.replace(pos, 2, oss.str());
         }
         return result;
@@ -110,6 +126,9 @@ private:
     goldearn::utils::Logger::instance().log_formatted(goldearn::utils::LogLevel::INFO, msg, ##__VA_ARGS__)
 
 #define LOG_WARNING(msg, ...) \
+    goldearn::utils::Logger::instance().log_formatted(goldearn::utils::LogLevel::WARNING, msg, ##__VA_ARGS__)
+
+#define LOG_WARN(msg, ...) \
     goldearn::utils::Logger::instance().log_formatted(goldearn::utils::LogLevel::WARNING, msg, ##__VA_ARGS__)
 
 #define LOG_ERROR(msg, ...) \

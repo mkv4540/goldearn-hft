@@ -4,7 +4,7 @@
 #include <thread>
 #include <chrono>
 #include <iomanip>
-#include "../utils/logger.hpp"
+#include "../utils/simple_logger.hpp"
 #include "../core/latency_tracker.hpp"
 
 using namespace goldearn;

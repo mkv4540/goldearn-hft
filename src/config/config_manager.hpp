@@ -5,8 +5,12 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
+#include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <nlohmann/json.hpp>
 
 namespace goldearn::config {
 
@@ -131,11 +135,32 @@ public:
     // Get configuration section
     std::shared_ptr<ConfigSection> get_section(const std::string& section_name);
     
-    // Convenience getters
+    // Additional methods for full key access
+    std::string get_string(const std::string& full_key, const std::string& default_value = "") const;
+    int64_t get_int(const std::string& full_key, int64_t default_value = 0) const;
+    double get_double(const std::string& full_key, double default_value = 0.0) const;
+    bool get_bool(const std::string& full_key, bool default_value = false) const;
+    
+    // Check if section exists
+    bool has_section(const std::string& section_name) const;
+    std::vector<std::string> get_section_names() const;
+    
+    // Convenience getters (non-const for compatibility)
     std::string get_string(const std::string& section, const std::string& key, 
                           const std::string& default_value = "") {
         auto sec = get_section(section);
         return sec->get(key, ConfigValue(default_value)).as_string();
+    }
+    
+    // Const version needed by get_environment
+    std::string get_string(const std::string& section, const std::string& key, 
+                          const std::string& default_value = "") const {
+        std::shared_lock<std::shared_mutex> lock(sections_mutex_);
+        auto it = sections_.find(section);
+        if (it != sections_.end()) {
+            return it->second->get(key, ConfigValue(default_value)).as_string();
+        }
+        return default_value;
     }
     
     int64_t get_int(const std::string& section, const std::string& key, 
@@ -156,11 +181,64 @@ public:
         return sec->get(key, ConfigValue(default_value)).as_bool();
     }
     
-    // Set values
+    // Set values (dot notation support)
+    void set_value(const std::string& full_key, const std::string& value);
+    
     void set_string(const std::string& section, const std::string& key, 
                    const std::string& value) {
         auto sec = get_section(section);
         sec->set(key, ConfigValue(value));
+    }
+    
+    // Get values with dot notation
+    std::string get_value(const std::string& full_key, const std::string& default_value = "") {
+        size_t dot_pos = full_key.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string section_name = full_key.substr(0, dot_pos);
+            std::string key = full_key.substr(dot_pos + 1);
+            return get_string(section_name, key, default_value);
+        } else {
+            return get_string("default", full_key, default_value);
+        }
+    }
+    
+    int64_t get_int(const std::string& full_key, int64_t default_value = 0) {
+        size_t dot_pos = full_key.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string section_name = full_key.substr(0, dot_pos);
+            std::string key = full_key.substr(dot_pos + 1);
+            return get_int(section_name, key, default_value);
+        } else {
+            return get_int("default", full_key, default_value);
+        }
+    }
+    
+    double get_double(const std::string& full_key, double default_value = 0.0) {
+        size_t dot_pos = full_key.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string section_name = full_key.substr(0, dot_pos);
+            std::string key = full_key.substr(dot_pos + 1);
+            return get_double(section_name, key, default_value);
+        } else {
+            return get_double("default", full_key, default_value);
+        }
+    }
+    
+    bool get_bool(const std::string& full_key, bool default_value = false) {
+        size_t dot_pos = full_key.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string section_name = full_key.substr(0, dot_pos);
+            std::string key = full_key.substr(dot_pos + 1);
+            return get_bool(section_name, key, default_value);
+        } else {
+            return get_bool("default", full_key, default_value);
+        }
+    }
+    
+    // Check if section exists  
+    bool has_section(const std::string& section_name) {
+        std::shared_lock<std::shared_mutex> lock(sections_mutex_);
+        return sections_.find(section_name) != sections_.end();
     }
     
     // Reload configuration
@@ -170,9 +248,7 @@ public:
     bool validate() const;
     
     // Get environment (development, testing, production)
-    std::string get_environment() const {
-        return get_string("system", "environment", "development");
-    }
+    std::string get_environment() const;
     
     // Check if in production mode
     bool is_production() const {
@@ -186,9 +262,33 @@ private:
     bool parse_json_file(const std::string& filename);
     std::string trim(const std::string& str);
     
-    mutable std::mutex mutex_;
+    // Secure JSON parsing methods using nlohmann/json
+    bool parse_json_object(const nlohmann::json& json_obj, const std::string& prefix);
+    
+    // Add missing ConfigValue methods
+    ConfigValue json_to_config_value(const nlohmann::json& json_val);
+    bool validate_json_structure(const nlohmann::json& json_data);
+    bool validate_json_depth(const nlohmann::json& json_data, int current_depth, int max_depth);
+    bool validate_config_key(const std::string& key);
+    
+    // Secure credential encryption/decryption
+    bool encrypt_credential(const std::string& plaintext, std::string& encrypted_data);
+    bool decrypt_credential(const std::string& encrypted_data, std::string& plaintext);
+    std::string calculate_secure_hmac(const std::string& data, const std::string& key);
+    
+    // Base64 encoding/decoding
+    std::string base64_encode(const std::string& input);
+    std::string base64_decode(const std::string& input);
+    
+    // Security constants
+    static constexpr int MAX_JSON_DEPTH = 10;
+    static constexpr size_t MAX_CONFIG_KEY_LENGTH = 128;
+    static constexpr size_t MAX_CONFIG_VALUE_LENGTH = 8192;
+    
+    mutable std::shared_mutex sections_mutex_;
     std::unordered_map<std::string, std::shared_ptr<ConfigSection>> sections_;
-    std::string config_filename_;
+    std::string filename_;
+    std::filesystem::file_time_type last_modified_;
 };
 
 // Production configuration templates

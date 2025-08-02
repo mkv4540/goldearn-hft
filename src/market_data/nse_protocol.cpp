@@ -1,5 +1,5 @@
 #include "nse_protocol.hpp"
-#include "../utils/logger.hpp"
+#include "../utils/simple_logger.hpp"
 #include <cstring>
 #include <algorithm>
 #include <sstream>
