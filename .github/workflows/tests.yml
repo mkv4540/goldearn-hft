@@ -23,7 +23,8 @@ jobs:
             cmake \
             ninja-build \
             build-essential \
-            libssl-dev
+            libssl-dev \
+            nlohmann-json3-dev
 
       - name: Install Google Test
         run: |
