@@ -6,7 +6,13 @@
       "Bash(chmod:*)",
       "Bash(timeout:*)",
       "Bash(./build.sh)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(sudo apt-get:*)",
+      "Bash(sudo apt-get install:*)",
+      "Bash(git clone:*)",
+      "Bash(cmake:*)",
+      "Bash(ls:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
