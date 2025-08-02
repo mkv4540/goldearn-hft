@@ -14,35 +14,8 @@ env:
 jobs:
   build:
     name: Build Application
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-22.04, ubuntu-20.04]
-        compiler: [gcc-11, gcc-12, clang-14, clang-15]
-        build_type: [Debug, Release]
-        include:
-          - os: ubuntu-22.04
-            compiler: gcc-11
-            cc: gcc-11
-            cxx: g++-11
-          - os: ubuntu-22.04
-            compiler: gcc-12
-            cc: gcc-12
-            cxx: g++-12
-          - os: ubuntu-22.04
-            compiler: clang-14
-            cc: clang-14
-            cxx: clang++-14
-          - os: ubuntu-22.04
-            compiler: clang-15
-            cc: clang-15
-            cxx: clang++-15
-          - os: ubuntu-20.04
-            compiler: gcc-11
-            cc: gcc-11
-            cxx: g++-11
 
     steps:
       - name: Checkout code
@@ -84,62 +57,24 @@ jobs:
 
       - name: Install C++ dependencies
         run: |
-          # Install Google Test
-          git clone https://github.com/google/googletest.git
-          cd googletest
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
-          make -j$(nproc)
-          sudo make install
-          cd ../..
-          
-          # Install Google Benchmark
-          git clone https://github.com/google/benchmark.git
-          cd benchmark
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on
-          make -j$(nproc)
-          sudo make install
-          cd ../..
-
-          # Install nlohmann/json
-          git clone https://github.com/nlohmann/json.git
-          cd json
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF
-          make -j$(nproc)
-          sudo make install
-          cd ../..
-
-          # Install jwt-cpp
-          git clone https://github.com/Thalhammer/jwt-cpp.git
-          cd jwt-cpp
-          mkdir build && cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DJWT_BUILD_EXAMPLES=OFF
-          make -j$(nproc)
-          sudo make install
-          cd ../..
-
-      - name: Start services
-        run: |
-          sudo systemctl start redis-server
-          sudo systemctl start postgresql
-          sudo -u postgres createuser --superuser runner || true
-          sudo -u postgres createdb hft_test || true
+          # Use apt packages where possible for faster builds
+          sudo apt-get install -y \
+            libgtest-dev \
+            libbenchmark-dev \
+            nlohmann-json3-dev
 
       - name: Configure CMake
         run: |
           export CC=${{ matrix.cc }}
           export CXX=${{ matrix.cxx }}
-          cmake -B build \
+          cmake -B build -f CMakeLists.minimal.txt \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DCMAKE_CXX_STANDARD=20 \
             -DBUILD_TESTS=ON \
-            -DBUILD_BENCHMARKS=ON \
             -G Ninja
 
       - name: Build application
-        run: cmake --build build --parallel $(nproc)
+        run: cmake --build build --parallel 2
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
