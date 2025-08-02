@@ -59,7 +59,11 @@ endif()
 
 # Google Benchmark for performance testing
 if(BUILD_BENCHMARKS)
-    find_package(benchmark REQUIRED)
+    find_package(benchmark QUIET)
+    if(NOT benchmark_FOUND)
+        message(WARNING "Google Benchmark not found. Benchmarks will be disabled.")
+        set(BUILD_BENCHMARKS OFF)
+    endif()
 endif()
 
 # Boost for some utilities

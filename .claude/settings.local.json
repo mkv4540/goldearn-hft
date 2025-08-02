@@ -16,7 +16,9 @@
       "Bash(make:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(brew install:*)"
+      "Bash(brew install:*)",
+      "Bash(rm:*)",
+      "Bash(cp:*)"
     ],
     "deny": []
   }
