@@ -2,6 +2,7 @@
 #include <iostream>
 #include <iomanip>
 #include <thread>
+#include <cstring>
 
 namespace goldearn::utils {
 

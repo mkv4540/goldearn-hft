@@ -3,6 +3,7 @@
 #include <numeric>
 #include <cmath>
 #include <thread>
+#include <mutex>
 
 namespace goldearn::core {
 
@@ -28,17 +29,6 @@ void LatencyTracker::record_latency_ns(uint64_t nanoseconds) {
     }
 }
 
-void LatencyTracker::start_timing() {
-    start_time_ = now();
-}
-
-void LatencyTracker::end_timing() {
-    auto end_time = now();
-    if (start_time_.time_since_epoch().count() > 0) { // Check if start_timing was called
-        record_latency(end_time - start_time_);
-        start_time_ = TimePoint{}; // Reset start time
-    }
-}
 
 double LatencyTracker::get_mean_latency_ns() const {
     uint64_t count = sample_count_.load();
