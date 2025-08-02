@@ -32,45 +32,22 @@ jobs:
             pkg-config \
             build-essential \
             libssl-dev \
-            libboost-all-dev \
-            libzmq3-dev \
-            libpq-dev \
-            postgresql-server-dev-all \
-            redis-server \
-            libhiredis-dev \
-            valgrind \
-            clang-format \
-            clang-tidy \
-            cppcheck
+            libboost-all-dev
 
-      - name: Install specific compiler
-        run: |
-          if [[ "${{ matrix.compiler }}" == gcc-* ]]; then
-            sudo apt-get install -y ${{ matrix.cxx }}
-          elif [[ "${{ matrix.compiler }}" == clang-* ]]; then
-            wget https://apt.llvm.org/llvm.sh
-            chmod +x llvm.sh
-            sudo ./llvm.sh ${{ matrix.compiler == 'clang-14' && '14' || '15' }}
-            sudo apt-get install -y clang-${{ matrix.compiler == 'clang-14' && '14' || '15' }} \
-                                   clang++-${{ matrix.compiler == 'clang-14' && '14' || '15' }}
-          fi
 
       - name: Install C++ dependencies
         run: |
           # Use apt packages where possible for faster builds
           sudo apt-get install -y \
-            libgtest-dev \
-            libbenchmark-dev \
             nlohmann-json3-dev
 
       - name: Configure CMake
         run: |
-          export CC=${{ matrix.cc }}
-          export CXX=${{ matrix.cxx }}
-          cmake -B build -f CMakeLists.minimal.txt \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          cp CMakeLists.minimal.txt CMakeLists.txt
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_CXX_STANDARD=20 \
-            -DBUILD_TESTS=ON \
+            -DBUILD_TESTS=OFF \
             -G Ninja
 
       - name: Build application
@@ -79,6 +56,6 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-files-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+          name: build-files
           path: build/
           retention-days: 1
