@@ -1,0 +1,148 @@
+version: '3.8'
+
+services:
+  # Main HFT build environment
+  goldearn-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goldearn-hft-build
+    volumes:
+      - .:/app
+      - build-cache:/app/build
+      - ~/.ssh:/home/hftuser/.ssh:ro
+    working_dir: /app
+    environment:
+      - CMAKE_BUILD_TYPE=Release
+      - ENABLE_TESTING=ON
+      - ENABLE_BENCHMARKS=ON
+    networks:
+      - hft-network
+    command: ["tail", "-f", "/dev/null"]  # Keep container running
+    
+  # Development environment with IDE support
+  goldearn-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goldearn-hft-dev
+    volumes:
+      - .:/app
+      - build-cache:/app/build
+      - dev-home:/home/hftuser
+    working_dir: /app
+    ports:
+      - "8080:8080"  # Web dashboard
+      - "9090:9090"  # Metrics endpoint
+      - "2345:2345"  # Delve debugger
+    environment:
+      - CMAKE_BUILD_TYPE=Debug
+      - ENABLE_PROFILING=ON
+      - ENABLE_SANITIZERS=ON
+    networks:
+      - hft-network
+    command: ["./scripts/dev-server.sh"]
+    
+  # Testing environment
+  goldearn-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goldearn-hft-test
+    volumes:
+      - .:/app
+      - test-results:/app/test-results
+    working_dir: /app
+    environment:
+      - CMAKE_BUILD_TYPE=Debug
+      - GTEST_OUTPUT=xml:/app/test-results/
+      - ENABLE_COVERAGE=ON
+    networks:
+      - hft-network
+    command: ["./scripts/run-tests.sh"]
+    
+  # Performance testing environment
+  goldearn-perf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: goldearn-hft-perf
+    volumes:
+      - .:/app
+      - perf-results:/app/perf-results
+    working_dir: /app
+    privileged: true  # Required for perf tools
+    environment:
+      - CMAKE_BUILD_TYPE=Release
+      - ENABLE_BENCHMARKS=ON
+    networks:
+      - hft-network
+    command: ["./scripts/run-benchmarks.sh"]
+    
+  # Redis for caching (development)
+  redis:
+    image: redis:7-alpine
+    container_name: goldearn-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - hft-network
+    command: redis-server --appendonly yes
+    
+  # PostgreSQL for persistent data (development)
+  postgres:
+    image: postgres:15-alpine
+    container_name: goldearn-postgres
+    environment:
+      POSTGRES_DB: goldearn_hft
+      POSTGRES_USER: hftuser
+      POSTGRES_PASSWORD: hft_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hft-network
+      
+  # ClickHouse for time-series data (development)
+  clickhouse:
+    image: clickhouse/clickhouse-server:23
+    container_name: goldearn-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./scripts/clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - hft-network
+    environment:
+      CLICKHOUSE_DB: hft_analytics
+      CLICKHOUSE_USER: hftuser
+      CLICKHOUSE_PASSWORD: hft_dev_password
+
+volumes:
+  build-cache:
+    driver: local
+  dev-home:
+    driver: local
+  test-results:
+    driver: local
+  perf-results:
+    driver: local
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  clickhouse-data:
+    driver: local
+
+networks:
+  hft-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
