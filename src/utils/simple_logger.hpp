@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <type_traits>
+#include <atomic>
 
 namespace goldearn::utils {
 
@@ -22,9 +24,21 @@ private:
     
     template<typename T>
     static std::string to_string(const T& value) {
-        std::ostringstream oss;
-        oss << value;
-        return oss.str();
+        if constexpr (std::is_arithmetic_v<T>) {
+            std::ostringstream oss;
+            oss << value;
+            return oss.str();
+        } else {
+            std::ostringstream oss;
+            oss << value;
+            return oss.str();
+        }
+    }
+    
+    // Specialization for atomic types
+    template<typename T>
+    static std::string to_string(const std::atomic<T>& value) {
+        return to_string(value.load());
     }
     
     template<typename T, typename... Args>

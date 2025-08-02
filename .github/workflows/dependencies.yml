@@ -1,0 +1,60 @@
+name: Dependencies Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  dependency-audit:
+    name: Security & Dependency Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install security tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            gcc-12 \
+            g++-12 \
+            cppcheck
+
+      - name: Run security scan with cppcheck
+        run: |
+          cppcheck --enable=all --std=c++20 --xml --xml-version=2 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --output-file=cppcheck-report.xml \
+            src/ 2>&1 || true
+
+      - name: Check for vulnerable patterns
+        run: |
+          echo "Checking for common security vulnerabilities..."
+          # Check for buffer overflows patterns
+          if grep -r "strcpy\|strcat\|sprintf\|gets" src/; then
+            echo "⚠️  Warning: Found potentially unsafe string functions"
+          fi
+          
+          # Check for hardcoded credentials patterns
+          if grep -ri "password\|secret\|key.*=" src/ --exclude-dir=tests; then
+            echo "⚠️  Warning: Possible hardcoded credentials found"
+          fi
+          
+          # Check for SQL injection patterns  
+          if grep -r "SELECT.*+\|INSERT.*+\|UPDATE.*+" src/; then
+            echo "⚠️  Warning: Possible SQL injection vulnerability"
+          fi
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-report
+          path: cppcheck-report.xml
+          retention-days: 30

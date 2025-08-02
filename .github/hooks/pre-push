@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Pre-push hook for C++ HFT project
+# Prevents direct pushes to main branch and runs additional checks
+
+protected_branch='main'
+current_branch=$(git symbolic-ref HEAD | sed -e 's,.*/\(.*\),\1,')
+
+# Check if pushing to protected branch
+if [ "$current_branch" = "$protected_branch" ]; then
+    echo "🚫 Direct pushes to the main branch are not allowed!"
+    echo "Please create a feature branch and submit a pull request."
+    echo ""
+    echo "To create a new branch:"
+    echo "  git checkout -b feature/your-feature-name"
+    echo ""
+    echo "Then push your feature branch:"
+    echo "  git push origin feature/your-feature-name"
+    exit 1
+fi
+
+# Run quick build check if CMakeLists.txt exists
+if [ -f "CMakeLists.txt" ]; then
+    echo "🔍 Running quick build check..."
+    
+    # Create temporary build directory
+    temp_build_dir=$(mktemp -d)
+    
+    # Try to configure cmake
+    if cmake -B "$temp_build_dir" -DCMAKE_BUILD_TYPE=Debug >/dev/null 2>&1; then
+        echo "✅ CMake configuration successful"
+        
+        # Try to build (just configuration, not full build)
+        if cmake --build "$temp_build_dir" --target help >/dev/null 2>&1; then
+            echo "✅ Build configuration valid"
+        else
+            echo "⚠️  Warning: Build configuration issues detected"
+        fi
+    else
+        echo "❌ CMake configuration failed"
+        echo "Please fix CMakeLists.txt issues before pushing"
+        rm -rf "$temp_build_dir"
+        exit 1
+    fi
+    
+    # Cleanup
+    rm -rf "$temp_build_dir"
+fi
+
+# Check if tests directory exists and has test files
+if [ -d "tests" ]; then
+    test_files=$(find tests -name "*.cpp" -o -name "*.cc" 2>/dev/null | wc -l)
+    if [ "$test_files" -eq 0 ]; then
+        echo "⚠️  Warning: No test files found in tests directory"
+        echo "Consider adding unit tests for your changes"
+    else
+        echo "✅ Test files found: $test_files"
+    fi
+fi
+
+echo "✅ Pre-push checks completed"
+exit 0

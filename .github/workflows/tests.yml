@@ -1,0 +1,85 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            gcc-12 \
+            g++-12 \
+            libssl-dev \
+            libboost-all-dev \
+            libzmq3-dev \
+            libpq-dev \
+            libhiredis-dev \
+            redis-server \
+            postgresql
+
+      - name: Install C++ test dependencies
+        run: |
+          # Install Google Test
+          git clone https://github.com/google/googletest.git
+          cd googletest
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+          # Install nlohmann/json
+          git clone https://github.com/nlohmann/json.git
+          cd json
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+          # Install jwt-cpp
+          git clone https://github.com/Thalhammer/jwt-cpp.git
+          cd jwt-cpp
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DJWT_BUILD_EXAMPLES=OFF
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+      - name: Start services
+        run: |
+          sudo systemctl start redis-server
+          sudo systemctl start postgresql
+          sudo -u postgres createuser --superuser runner || true
+          sudo -u postgres createdb hft_test || true
+
+      - name: Configure and build
+        run: |
+          export CC=gcc-12
+          export CXX=g++-12
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DBUILD_TESTS=ON \
+            -G Ninja
+          cmake --build build --parallel $(nproc)
+
+      - name: Run tests
+        run: |
+          cd build
+          ctest --output-on-failure --parallel $(nproc)

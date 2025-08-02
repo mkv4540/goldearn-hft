@@ -164,9 +164,13 @@ public:
     }
     
     int64_t get_int(const std::string& section, const std::string& key, 
-                   int64_t default_value = 0) {
-        auto sec = get_section(section);
-        return sec->get(key, ConfigValue(default_value)).as_int();
+                   int64_t default_value = 0) const {
+        std::shared_lock<std::shared_mutex> lock(sections_mutex_);
+        auto it = sections_.find(section);
+        if (it != sections_.end()) {
+            return it->second->get(key, ConfigValue(default_value)).as_int();
+        }
+        return default_value;
     }
     
     double get_double(const std::string& section, const std::string& key, 

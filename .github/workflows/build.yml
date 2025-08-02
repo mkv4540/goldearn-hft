@@ -1,0 +1,149 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  CMAKE_BUILD_TYPE: Release
+  BUILD_TESTS: ON
+  BUILD_BENCHMARKS: ON
+
+jobs:
+  build:
+    name: Build Application
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04]
+        compiler: [gcc-11, gcc-12, clang-14, clang-15]
+        build_type: [Debug, Release]
+        include:
+          - os: ubuntu-22.04
+            compiler: gcc-11
+            cc: gcc-11
+            cxx: g++-11
+          - os: ubuntu-22.04
+            compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+          - os: ubuntu-22.04
+            compiler: clang-14
+            cc: clang-14
+            cxx: clang++-14
+          - os: ubuntu-22.04
+            compiler: clang-15
+            cc: clang-15
+            cxx: clang++-15
+          - os: ubuntu-20.04
+            compiler: gcc-11
+            cc: gcc-11
+            cxx: g++-11
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            pkg-config \
+            build-essential \
+            libssl-dev \
+            libboost-all-dev \
+            libzmq3-dev \
+            libpq-dev \
+            postgresql-server-dev-all \
+            redis-server \
+            libhiredis-dev \
+            valgrind \
+            clang-format \
+            clang-tidy \
+            cppcheck
+
+      - name: Install specific compiler
+        run: |
+          if [[ "${{ matrix.compiler }}" == gcc-* ]]; then
+            sudo apt-get install -y ${{ matrix.cxx }}
+          elif [[ "${{ matrix.compiler }}" == clang-* ]]; then
+            wget https://apt.llvm.org/llvm.sh
+            chmod +x llvm.sh
+            sudo ./llvm.sh ${{ matrix.compiler == 'clang-14' && '14' || '15' }}
+            sudo apt-get install -y clang-${{ matrix.compiler == 'clang-14' && '14' || '15' }} \
+                                   clang++-${{ matrix.compiler == 'clang-14' && '14' || '15' }}
+          fi
+
+      - name: Install C++ dependencies
+        run: |
+          # Install Google Test
+          git clone https://github.com/google/googletest.git
+          cd googletest
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+          
+          # Install Google Benchmark
+          git clone https://github.com/google/benchmark.git
+          cd benchmark
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+          # Install nlohmann/json
+          git clone https://github.com/nlohmann/json.git
+          cd json
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DJSON_BuildTests=OFF
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+          # Install jwt-cpp
+          git clone https://github.com/Thalhammer/jwt-cpp.git
+          cd jwt-cpp
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DJWT_BUILD_EXAMPLES=OFF
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+
+      - name: Start services
+        run: |
+          sudo systemctl start redis-server
+          sudo systemctl start postgresql
+          sudo -u postgres createuser --superuser runner || true
+          sudo -u postgres createdb hft_test || true
+
+      - name: Configure CMake
+        run: |
+          export CC=${{ matrix.cc }}
+          export CXX=${{ matrix.cxx }}
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_STANDARD=20 \
+            -DBUILD_TESTS=ON \
+            -DBUILD_BENCHMARKS=ON \
+            -G Ninja
+
+      - name: Build application
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: build/
+          retention-days: 1
