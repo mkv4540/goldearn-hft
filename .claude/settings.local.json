@@ -13,7 +13,9 @@
       "Bash(cmake:*)",
       "Bash(ls:*)",
       "Bash(ls:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
