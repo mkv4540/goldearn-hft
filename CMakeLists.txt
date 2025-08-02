@@ -208,7 +208,7 @@ if(BUILD_TESTS)
 endif()
 
 # Benchmarks
-if(BUILD_BENCHMARKS)
+if(BUILD_BENCHMARKS AND EXISTS "${CMAKE_SOURCE_DIR}/benchmarks")
     add_subdirectory(benchmarks)
 endif()
 

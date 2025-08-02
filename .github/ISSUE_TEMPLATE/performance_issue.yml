@@ -1,0 +1,133 @@
+name: Performance Issue
+description: Report a performance problem in the HFT system
+title: "[PERFORMANCE] "
+labels: ["performance", "needs-investigation"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a performance issue! Please provide as much detail as possible.
+
+  - type: input
+    id: affected-component
+    attributes:
+      label: Affected Component
+      description: Which system component has the performance issue?
+      placeholder: e.g., Order Book, Market Data Feed, Trading Engine
+    validations:
+      required: true
+
+  - type: textarea
+    id: performance-issue
+    attributes:
+      label: Performance Issue Description
+      description: Describe the performance problem
+      placeholder: What performance issue are you experiencing?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: metric-type
+    attributes:
+      label: Performance Metric
+      description: What type of performance issue is this?
+      options:
+        - Latency (Response time)
+        - Throughput (Messages/trades per second)
+        - Memory Usage
+        - CPU Usage
+        - Network I/O
+        - Disk I/O
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-metrics
+    attributes:
+      label: Current Performance Metrics
+      description: Provide current performance measurements
+      placeholder: |
+        - Latency: 500μs (target: <100μs)
+        - Throughput: 10K msg/s (target: 50K msg/s)
+        - Memory: 2GB RAM usage
+        - CPU: 80% utilization
+    validations:
+      required: true
+
+  - type: textarea
+    id: target-metrics
+    attributes:
+      label: Target Performance Metrics
+      description: What performance levels are you trying to achieve?
+      placeholder: |
+        - Target latency: <100μs
+        - Target throughput: 50K msg/s
+        - Target memory: <1GB
+    validations:
+      required: true
+
+  - type: textarea
+    id: test-scenario
+    attributes:
+      label: Test Scenario
+      description: Describe the test conditions
+      placeholder: |
+        - Market conditions: High volatility
+        - Message rate: 100K/second
+        - Order size: 1000 shares
+        - Duration: 30 minutes
+    validations:
+      required: true
+
+  - type: textarea
+    id: system-config
+    attributes:
+      label: System Configuration
+      description: Hardware and software configuration
+      placeholder: |
+        - CPU: Intel Xeon E5-2690 v4
+        - RAM: 64GB DDR4
+        - Storage: NVMe SSD
+        - Network: 10Gbps
+        - OS: Ubuntu 22.04
+        - Compiler: GCC 12 -O3
+    validations:
+      required: true
+
+  - type: textarea
+    id: profiling-data
+    attributes:
+      label: Profiling Data
+      description: Any profiling or monitoring data
+      placeholder: Include perf, valgrind, or other profiling output
+      render: shell
+
+  - type: dropdown
+    id: urgency
+    attributes:
+      label: Urgency
+      description: How urgent is this performance issue?
+      options:
+        - Low (Optimization opportunity)
+        - Medium (Affects efficiency)
+        - High (Impacts trading)
+        - Critical (System unusable)
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have measured performance with proper tools
+          required: true
+        - label: I have compared against baseline/target metrics
+          required: true
+        - label: I have checked for obvious configuration issues
+          required: true
+        - label: This is reproducible under specific conditions
+          required: true
