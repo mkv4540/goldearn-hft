@@ -77,19 +77,6 @@ jobs:
           add_test(NAME LatencyTrackerTests COMMAND test_latency_tracker)
           EOF
 
-      - name: Fix C++ compilation issues
-        run: |
-          # Fix missing includes
-          if ! grep -q "#include <cstring>" src/utils/logger.cpp; then
-            sed -i '4a#include <cstring>' src/utils/logger.cpp
-          fi
-          if ! grep -q "#include <mutex>" src/core/latency_tracker.cpp; then
-            sed -i '5a#include <mutex>' src/core/latency_tracker.cpp
-          fi
-          
-          # Remove duplicate function definitions
-          sed -i '/^void LatencyTracker::start_timing/,/^}/d' src/core/latency_tracker.cpp
-          sed -i '/^void LatencyTracker::end_timing/,/^}/d' src/core/latency_tracker.cpp
 
       - name: Configure and build tests
         run: |
@@ -104,15 +91,5 @@ jobs:
         run: |
           cd build
           echo "Running comprehensive test suite..."
-          # Run tests with CTest
-          ctest --output-on-failure --verbose || echo "Some tests failed but continuing..."
-          
-          # Also run individual tests to see more details
-          echo "=== Running BasicConfigTests ==="
-          ./test_basic_config || echo "BasicConfig tests completed"
-          
-          echo "=== Running BasicSecurityTests ==="
-          ./test_basic_security || echo "BasicSecurity tests completed"
-          
-          echo "=== Running LatencyTrackerTests ==="
-          ./test_latency_tracker || echo "LatencyTracker tests completed"
+          # Run tests with CTest - fail if any tests fail
+          ctest --output-on-failure --verbose

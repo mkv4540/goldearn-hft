@@ -41,74 +41,11 @@ jobs:
           sudo apt-get install -y \
             nlohmann-json3-dev
 
-      - name: Fix C++ compilation issues
-        run: |
-          # Fix missing includes in logger.cpp
-          if ! grep -q "#include <cstring>" src/utils/logger.cpp; then
-            sed -i '4a#include <cstring>' src/utils/logger.cpp
-          fi
-          
-          # Fix missing includes in latency_tracker.cpp
-          if ! grep -q "#include <mutex>" src/core/latency_tracker.cpp; then
-            sed -i '5a#include <mutex>' src/core/latency_tracker.cpp
-          fi
-          
-          # Remove duplicate function definitions from latency_tracker.cpp
-          sed -i '/^void LatencyTracker::start_timing/,/^}/d' src/core/latency_tracker.cpp
-          sed -i '/^void LatencyTracker::end_timing/,/^}/d' src/core/latency_tracker.cpp
 
-      - name: Use minimal CMakeLists.txt
+      - name: Use existing CMakeLists.txt with proper dependencies
         run: |
-          # Check if minimal file exists
-          echo "=== Files in root directory ==="
-          ls -la CMakeLists*
-          
-          # Show content of minimal file
-          echo "=== Content of CMakeLists.minimal.txt ==="
-          head -10 CMakeLists.minimal.txt
-          
-          # Backup original and use minimal version
-          mv CMakeLists.txt CMakeLists.txt.backup
-          cp CMakeLists.minimal.txt CMakeLists.txt
-          
-          # Verify the copy worked
-          echo "=== New CMakeLists.txt content ==="
-          head -10 CMakeLists.txt
-          
-      - name: Create simple CMakeLists.txt if needed
-        run: |
-          # Always create ultra-minimal CMakeLists.txt for guaranteed success
-          echo "Creating ultra-minimal CMakeLists.txt..."
-          cat > CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.20)
-          project(GoldEarn_HFT_Simple VERSION 1.0.0 LANGUAGES CXX)
-          
-          set(CMAKE_CXX_STANDARD 20)
-          set(CMAKE_CXX_STANDARD_REQUIRED ON)
-          
-          find_package(Threads REQUIRED)
-          find_package(OpenSSL REQUIRED)
-          
-          # Simple library with only 2 working files
-          add_library(goldearn_simple STATIC 
-            src/utils/logger.cpp
-            src/core/latency_tracker.cpp
-          )
-          
-          target_include_directories(goldearn_simple PUBLIC ${CMAKE_SOURCE_DIR}/src)
-          target_link_libraries(goldearn_simple Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
-          
-          # Create a simple main.cpp for testing
-          file(WRITE "${CMAKE_SOURCE_DIR}/main.cpp" 
-            "#include <iostream>\nint main() { std::cout << \"Build successful!\" << std::endl; return 0; }")
-          
-          # Simple executable for testing
-          add_executable(simple_test main.cpp)
-          target_link_libraries(simple_test Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
-          EOF
-          
-          echo "=== Final CMakeLists.txt content ==="
-          cat CMakeLists.txt
+          echo "Using existing build configuration"
+          echo "CMakeLists.txt should build without modifications"
 
       - name: Configure CMake
         run: |
