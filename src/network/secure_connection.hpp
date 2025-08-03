@@ -7,6 +7,8 @@
 #include <functional>
 #include <vector>
 #include <mutex>
+#include <shared_mutex>
+#include <unordered_map>
 
 namespace goldearn::network {
 

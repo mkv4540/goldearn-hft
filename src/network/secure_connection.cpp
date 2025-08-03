@@ -1,5 +1,5 @@
 #include "secure_connection.hpp"
-#include "../utils/logger.hpp"
+#include "../utils/simple_logger.hpp"
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>

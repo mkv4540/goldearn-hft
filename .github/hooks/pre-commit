@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+# Pre-commit hook for C++ HFT project
+# Prevents direct commits to main branch and runs code quality checks
+
+# Ensure script runs in Bash
+if [ -z "$BASH" ]; then
+    echo "Error: This script must be run in Bash (use Git Bash on Windows)"
+    exit 1
+fi
+
+# Get current branch name
+current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to get current branch name"
+    exit 1
+fi
+
+protected_branch="main"
+
+# Check if committing to protected branch
+if [ "$current_branch" = "$protected_branch" ]; then
+    echo "🚫 Direct commits to the $protected_branch branch are not allowed!"
+    echo "Please create a feature branch and work on it instead."
+    echo ""
+    echo "To create a new branch:"
+    echo "  git checkout -b feature/your-feature-name"
+    echo ""
+    echo "To switch to an existing branch:"
+    echo "  git checkout your-branch-name"
+    echo ""
+    echo "Current branch: $current_branch"
+    exit 1
+fi
+
+# Check if clang-format is available
+if command -v clang-format >/dev/null 2>&1; then
+    echo "🔍 Checking code formatting..."
+    
+    # Get list of staged C++ files
+    staged_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(cpp|hpp|h|cc|cxx)$')
+    
+    if [ -n "$staged_files" ]; then
+        echo "Checking formatting for: $staged_files"
+        
+        # Check each file
+        for file in $staged_files; do
+            if [ -f "$file" ]; then
+                # Check if file needs formatting
+                if ! clang-format --dry-run --Werror "$file" >/dev/null 2>&1; then
+                    echo "❌ File $file is not properly formatted"
+                    echo "Please run: clang-format -i $file"
+                    exit 1
+                fi
+            fi
+        done
+        
+        echo "✅ All C++ files are properly formatted"
+    fi
+else
+    echo "⚠️  Warning: clang-format not found, skipping format check"
+fi
+
+# Check for common security issues
+echo "🔍 Running basic security checks..."
+
+# Check for hardcoded secrets patterns in staged files
+staged_content=$(git diff --cached)
+if echo "$staged_content" | grep -iE "(password|secret|key|token).*=.*['\"][^'\"]{8,}['\"]"; then
+    echo "❌ Potential hardcoded secrets detected in staged changes"
+    echo "Please remove hardcoded credentials before committing"
+    exit 1
+fi
+
+# Check for unsafe C++ functions
+if echo "$staged_content" | grep -E "strcpy|strcat|sprintf|gets"; then
+    echo "⚠️  Warning: Unsafe string functions detected (strcpy, strcat, sprintf, gets)"
+    echo "Consider using safer alternatives"
+fi
+
+echo "✅ Pre-commit checks passed"
+exit 0

@@ -48,6 +48,11 @@ public:
     uint64_t get_messages_processed() const { return messages_processed_; }
     uint64_t get_parse_errors() const { return parse_errors_; }
     
+    // NSE-specific message conversion (made public for testing)
+    TradeMessage parse_nse_trade(const uint8_t* data);
+    QuoteMessage parse_nse_quote(const uint8_t* data);
+    OrderUpdateMessage parse_nse_order(const uint8_t* data);
+    
 private:
     ParserState state_;
     uint8_t* buffer_;
@@ -77,14 +82,10 @@ private:
     void receive_thread_func();
     void reset_parser_state();
     
+private:
     // Rate limiting
     std::unique_ptr<core::RateLimiter> message_rate_limiter_;
     std::unique_ptr<core::SlidingWindowRateLimiter> connection_rate_limiter_;
-    
-    // NSE-specific message conversion
-    TradeMessage parse_nse_trade(const uint8_t* data);
-    QuoteMessage parse_nse_quote(const uint8_t* data);
-    OrderUpdateMessage parse_nse_order(const uint8_t* data);
 };
 
 // NSE symbol mapping and management

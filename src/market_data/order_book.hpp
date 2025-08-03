@@ -29,6 +29,11 @@ public:
     static constexpr size_t MAX_DEPTH = 20; // Maximum depth levels to track
     
     OrderBook(uint64_t symbol_id, double tick_size);
+    
+    // Convenience constructor for string symbol (converts to hash)
+    OrderBook(const std::string& symbol, double tick_size = 0.05) 
+        : OrderBook(std::hash<std::string>{}(symbol), tick_size) {}
+    
     ~OrderBook();
     
     // Core order book operations

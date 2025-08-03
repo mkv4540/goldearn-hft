@@ -1,0 +1,118 @@
+cmake_minimum_required(VERSION 3.20)
+project(GoldEarn_HFT_Minimal VERSION 1.0.0 LANGUAGES CXX)
+
+# Set C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Build configuration
+option(BUILD_TESTS "Build unit tests" ON)
+
+# Find required packages (minimal set)
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+
+# Try to find optional packages
+find_package(nlohmann_json QUIET)
+find_package(GTest QUIET)
+
+# Compiler-specific optimizations
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pthread")
+endif()
+
+# Core source files (minimal set for testing)
+set(CORE_SOURCES
+    src/core/latency_tracker.cpp
+    src/utils/logger.cpp
+    src/config/config_manager.cpp
+)
+
+# Only add security sources if we have the dependencies
+if(nlohmann_json_FOUND)
+    list(APPEND CORE_SOURCES 
+        src/config/secure_config_manager.cpp
+        src/monitoring/health_check.cpp
+        src/monitoring/prometheus_metrics.cpp
+        src/monitoring/secure_health_check.cpp
+        src/security/certificate_manager.cpp
+    )
+    
+    # Try to find jwt-cpp
+    find_package(jwt-cpp QUIET)
+    if(jwt-cpp_FOUND)
+        list(APPEND CORE_SOURCES src/security/secure_jwt_manager.cpp)
+    endif()
+endif()
+
+# Create minimal library
+add_library(goldearn_core_minimal STATIC ${CORE_SOURCES})
+
+# Set library properties
+set_target_properties(goldearn_core_minimal PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+)
+
+# Link required libraries
+target_link_libraries(goldearn_core_minimal
+    Threads::Threads
+    OpenSSL::SSL
+    OpenSSL::Crypto
+)
+
+# Add optional libraries
+if(nlohmann_json_FOUND)
+    target_link_libraries(goldearn_core_minimal nlohmann_json::nlohmann_json)
+    target_compile_definitions(goldearn_core_minimal PRIVATE HAVE_NLOHMANN_JSON)
+endif()
+
+if(jwt-cpp_FOUND)
+    target_link_libraries(goldearn_core_minimal jwt-cpp::jwt-cpp)
+    target_compile_definitions(goldearn_core_minimal PRIVATE HAVE_JWT_CPP)
+endif()
+
+# Include directories
+target_include_directories(goldearn_core_minimal PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+# Simple test executable
+if(BUILD_TESTS AND GTest_FOUND)
+    enable_testing()
+    
+    # Basic security test
+    add_executable(test_security_minimal
+        tests/test_basic_security.cpp
+    )
+    
+    target_link_libraries(test_security_minimal
+        goldearn_core_minimal
+        GTest::gtest
+        GTest::gtest_main
+    )
+    
+    add_test(NAME BasicSecurityTests COMMAND test_security_minimal)
+    
+    # Configuration test
+    add_executable(test_config_minimal
+        tests/test_basic_config.cpp
+    )
+    
+    target_link_libraries(test_config_minimal
+        goldearn_core_minimal
+        GTest::gtest
+        GTest::gtest_main
+    )
+    
+    add_test(NAME BasicConfigTests COMMAND test_config_minimal)
+endif()
+
+# Print configuration summary
+message(STATUS "=== GoldEarn HFT Minimal Build Configuration ===")
+message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "OpenSSL found: ${OPENSSL_FOUND}")
+message(STATUS "nlohmann/json found: ${nlohmann_json_FOUND}")
+message(STATUS "jwt-cpp found: ${jwt-cpp_FOUND}")
+message(STATUS "GTest found: ${GTest_FOUND}")
+message(STATUS "Build tests: ${BUILD_TESTS}")

@@ -1,0 +1,26 @@
+# Global owners
+* @manishkumar
+
+# Core trading engine
+/src/trading/ @trading-team
+/src/market_data/ @data-team
+
+# Infrastructure and configuration
+/src/config/ @devops-team
+/docker/ @devops-team
+/.github/ @devops-team
+/CMakeLists.txt @devops-team
+
+# Security and network components
+/src/security/ @security-team
+/src/network/ @security-team
+
+# Risk management
+/src/risk/ @risk-team
+
+# Monitoring and performance
+/src/monitoring/ @monitoring-team
+/src/core/ @performance-team
+
+# Tests
+/tests/ @qa-team

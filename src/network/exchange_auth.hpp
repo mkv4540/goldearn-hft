@@ -4,6 +4,10 @@
 #include <memory>
 #include <chrono>
 #include <functional>
+#include <thread>
+#include <atomic>
+#include <unordered_map>
+#include <filesystem>
 #include "../config/config_manager.hpp"
 
 namespace goldearn::network {
@@ -69,6 +73,12 @@ private:
     
     // HTTP client for API calls
     bool make_auth_request(const std::string& url, const std::string& payload, std::string& response);
+    
+    // Helper methods
+    bool validate_credentials() const;
+    bool parse_auth_response(const std::string& response);
+    bool parse_url(const std::string& url, std::string& host, uint16_t& port, std::string& path);
+    bool refresh_oauth2_token();
     
 private:
     std::string exchange_name_;
@@ -154,6 +164,9 @@ namespace auth_utils {
     
     // Generate secure random session ID
     std::string generate_session_id();
+    
+    // Generate HMAC signature
+    std::string generate_hmac_signature(const std::string& message, const std::string& key);
     
     // Validate API key format
     bool validate_api_key_format(const std::string& api_key, const std::string& exchange);
