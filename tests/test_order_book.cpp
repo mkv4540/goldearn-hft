@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <thread>
+#include <vector>
 #include "../src/market_data/order_book.hpp"
 #include "../src/core/latency_tracker.hpp"
 

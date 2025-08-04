@@ -43,6 +43,11 @@ find_package(PkgConfig REQUIRED)
 
 # Redis/hiredis
 pkg_check_modules(HIREDIS REQUIRED hiredis)
+# On macOS, add homebrew library paths
+if(APPLE)
+    link_directories(/opt/homebrew/lib)
+    include_directories(/opt/homebrew/include)
+endif()
 
 # PostgreSQL
 find_package(PostgreSQL REQUIRED)
@@ -122,7 +127,9 @@ set(UTILS_SOURCES
 
 # Placeholder for future sources
 set(TRADING_SOURCES)
-set(RISK_SOURCES)
+set(RISK_SOURCES
+    src/risk/risk_engine.cpp
+)
 set(STRATEGIES_SOURCES)
 set(NETWORK_SOURCES
     src/network/secure_connection.cpp
@@ -138,16 +145,16 @@ set(SECURITY_SOURCES
     src/security/secure_jwt_manager.cpp
 )
 
-# Main library - temporarily exclude problematic sources
+# Main library - include all sources
 add_library(goldearn_core STATIC
     ${MARKET_DATA_SOURCES}
     ${CORE_SOURCES}
     ${CONFIG_SOURCES}
     ${UTILS_SOURCES}
-    # Temporarily exclude problematic network and monitoring sources
-    # ${NETWORK_SOURCES}
-    # ${MONITORING_SOURCES}
-    # ${SECURITY_SOURCES}
+    ${RISK_SOURCES}
+    ${NETWORK_SOURCES}
+    ${MONITORING_SOURCES}
+    ${SECURITY_SOURCES}
 )
 
 # Set library properties

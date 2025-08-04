@@ -48,9 +48,6 @@ bse_private_key_path = )" + test_dir_ + R"(/test_key.pem
         std::ofstream config_file(test_dir_ + "/test_auth.conf");
         config_file << config_content;
         config_file.close();
-        
-        auto& config = ConfigManager::instance();
-        config.load_from_file(test_dir_ + "/test_auth.conf");
     }
 
     std::string test_dir_;
@@ -59,8 +56,9 @@ bse_private_key_path = )" + test_dir_ + R"(/test_key.pem
 TEST_F(ExchangeAuthTest, InitializeNSEWithAPIKey) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Should prefer API key auth when both are available
     auto headers = nse_auth.get_auth_headers();
@@ -70,8 +68,9 @@ TEST_F(ExchangeAuthTest, InitializeNSEWithAPIKey) {
 TEST_F(ExchangeAuthTest, InitializeBSEWithAPIKey) {
     ExchangeAuthenticator bse_auth("BSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(bse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(bse_auth.initialize(*config));
     
     auto headers = bse_auth.get_auth_headers();
     EXPECT_FALSE(headers.empty());
@@ -88,11 +87,10 @@ nse_private_key_path = )" + test_dir_ + R"(/test_key.pem
     config_file << cert_only_config;
     config_file.close();
     
-    ConfigManager cert_config;
-    cert_config.load_from_file(test_dir_ + "/cert_only.conf");
+    auto cert_config = ConfigManager::load_from_file(test_dir_ + "/cert_only.conf");
     
     ExchangeAuthenticator nse_auth("NSE");
-    ASSERT_TRUE(nse_auth.initialize(cert_config));
+    ASSERT_TRUE(nse_auth.initialize(*cert_config));
 }
 
 TEST_F(ExchangeAuthTest, InitializeWithMissingCredentials) {
@@ -103,11 +101,10 @@ TEST_F(ExchangeAuthTest, InitializeWithMissingCredentials) {
     config_file << empty_config;
     config_file.close();
     
-    ConfigManager empty_config_mgr;
-    empty_config_mgr.load_from_file(test_dir_ + "/empty.conf");
+    auto empty_config_mgr = ConfigManager::load_from_file(test_dir_ + "/empty.conf");
     
     ExchangeAuthenticator nse_auth("NSE");
-    EXPECT_FALSE(nse_auth.initialize(empty_config_mgr));
+    EXPECT_FALSE(nse_auth.initialize(*empty_config_mgr));
 }
 
 TEST_F(ExchangeAuthTest, InitializeWithMissingCertificateFiles) {
@@ -121,25 +118,26 @@ nse_private_key_path = /nonexistent/key.pem
     config_file << bad_cert_config;
     config_file.close();
     
-    ConfigManager bad_config;
-    bad_config.load_from_file(test_dir_ + "/bad_cert.conf");
+    auto bad_config = ConfigManager::load_from_file(test_dir_ + "/bad_cert.conf");
     
     ExchangeAuthenticator nse_auth("NSE");
-    EXPECT_FALSE(nse_auth.initialize(bad_config));
+    EXPECT_FALSE(nse_auth.initialize(*bad_config));
 }
 
 TEST_F(ExchangeAuthTest, InitializeUnknownExchange) {
     ExchangeAuthenticator unknown_auth("UNKNOWN");
     
-    auto& config = ConfigManager::instance();
-    EXPECT_FALSE(unknown_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    EXPECT_FALSE(unknown_auth.initialize(*config));
 }
 
 TEST_F(ExchangeAuthTest, AuthenticationStateManagement) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Initially not authenticated
     EXPECT_FALSE(nse_auth.is_authenticated());
@@ -151,8 +149,9 @@ TEST_F(ExchangeAuthTest, AuthenticationStateManagement) {
 TEST_F(ExchangeAuthTest, AuthHeaderGeneration) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Before authentication, headers should be minimal
     auto headers_before = nse_auth.get_auth_headers();
@@ -166,8 +165,9 @@ TEST_F(ExchangeAuthTest, AuthHeaderGeneration) {
 TEST_F(ExchangeAuthTest, AuthStringGeneration) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Before authentication, auth string should be empty
     std::string auth_string = nse_auth.get_auth_string();
@@ -187,8 +187,9 @@ TEST_F(ExchangeAuthTest, CallbackRegistration) {
         callback_message = message;
     });
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Callback should be registered but not called yet
     EXPECT_FALSE(callback_called);
@@ -197,8 +198,9 @@ TEST_F(ExchangeAuthTest, CallbackRegistration) {
 TEST_F(ExchangeAuthTest, MultiExchangeAuthManager) {
     MultiExchangeAuthManager manager;
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(manager.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(manager.initialize(*config));
     
     // Should have authenticators for both NSE and BSE
     auto nse_auth = manager.get_authenticator("NSE");
@@ -223,8 +225,9 @@ TEST_F(ExchangeAuthTest, GlobalCallbackForMultiExchange) {
         callback_results.push_back(success);
     });
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(manager.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(manager.initialize(*config));
     
     // Callbacks should be registered but not called during initialization
     EXPECT_TRUE(callback_exchanges.empty());
@@ -302,8 +305,9 @@ TEST(AuthUtilsTest, CredentialEncryption) {
 TEST_F(ExchangeAuthTest, AuthenticationPerformanceTest) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Test header generation performance
     auto start = std::chrono::high_resolution_clock::now();
@@ -323,8 +327,9 @@ TEST_F(ExchangeAuthTest, AuthenticationPerformanceTest) {
 TEST_F(ExchangeAuthTest, ConcurrentAuthHeaderGeneration) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     std::atomic<int> successful_calls{0};
     std::atomic<bool> test_running{true};
@@ -360,8 +365,9 @@ TEST_F(ExchangeAuthTest, ConcurrentAuthHeaderGeneration) {
 TEST_F(ExchangeAuthTest, TokenExpiryEdgeCases) {
     ExchangeAuthenticator nse_auth("NSE");
     
-    auto& config = ConfigManager::instance();
-    ASSERT_TRUE(nse_auth.initialize(config));
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
+    ASSERT_TRUE(nse_auth.initialize(*config));
     
     // Test with certificate auth (should not expire)
     // This would require modifying the authenticator to use certificate auth
@@ -370,12 +376,13 @@ TEST_F(ExchangeAuthTest, TokenExpiryEdgeCases) {
 }
 
 TEST_F(ExchangeAuthTest, AuthenticatorDestructorSafety) {
-    auto& config = ConfigManager::instance();
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
     
     // Create authenticator in scope
     {
         ExchangeAuthenticator nse_auth("NSE");
-        ASSERT_TRUE(nse_auth.initialize(config));
+        ASSERT_TRUE(nse_auth.initialize(*config));
         // Destructor should handle cleanup safely
     }
     
@@ -387,10 +394,161 @@ TEST_F(ExchangeAuthTest, InvalidExchangeNameHandling) {
     // Test various invalid exchange names
     std::vector<std::string> invalid_names = {"", "nse", "bse", "NYSE", "NASDAQ", "123", "NSE_TEST"};
     
-    auto& config = ConfigManager::instance();
+    auto config = ConfigManager::load_from_file(test_dir_ + "/test_auth.conf");
+    ASSERT_TRUE(config);
     
     for (const auto& name : invalid_names) {
         ExchangeAuthenticator auth(name);
-        EXPECT_FALSE(auth.initialize(config)) << "Should fail for exchange name: " << name;
+        EXPECT_FALSE(auth.initialize(*config)) << "Should fail for exchange name: " << name;
     }
+}
+
+TEST_F(ExchangeAuthTest, InitializeWithValidConfig) {
+    // Create a valid configuration
+    auto config = ConfigManager::load_from_file(test_dir_ + "/valid_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator nse_auth("NSE");
+    EXPECT_TRUE(nse_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, InitializeWithEmptyConfig) {
+    // Create an empty configuration
+    auto config = ConfigManager::load_from_file(test_dir_ + "/empty.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator nse_auth("NSE");
+    EXPECT_FALSE(nse_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, InitializeWithInvalidConfig) {
+    // Create an invalid configuration
+    auto config = ConfigManager::load_from_file(test_dir_ + "/invalid_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator nse_auth("NSE");
+    EXPECT_FALSE(nse_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, TestNSECredentials) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/nse_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator nse_auth("NSE");
+    EXPECT_TRUE(nse_auth.initialize(*config));
+    
+    // Test credential retrieval
+    auto credentials = nse_auth.get_credentials();
+    EXPECT_EQ(credentials.api_key, "test_nse_api_key_1234567890abcdef");
+    EXPECT_EQ(credentials.secret_key, "test_nse_secret_key_abcdef1234567890");
+}
+
+TEST_F(ExchangeAuthTest, TestBSECredentials) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/bse_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator bse_auth("BSE");
+    EXPECT_TRUE(bse_auth.initialize(*config));
+    
+    // Test credential retrieval
+    auto credentials = bse_auth.get_credentials();
+    EXPECT_EQ(credentials.api_key, "test_bse_api_key_1234567890abcdef");
+    EXPECT_EQ(credentials.secret_key, "test_bse_secret_key_abcdef1234567890");
+}
+
+TEST_F(ExchangeAuthTest, TestCertificateAuthentication) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/cert_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator cert_auth("NSE");
+    EXPECT_TRUE(cert_auth.initialize(*config));
+    
+    auto credentials = cert_auth.get_credentials();
+    EXPECT_EQ(credentials.method, goldearn::network::ExchangeAuthenticator::AuthMethod::CERTIFICATE);
+    EXPECT_EQ(credentials.certificate_path, test_dir_ + "/test_cert.pem");
+    EXPECT_EQ(credentials.private_key_path, test_dir_ + "/test_key.pem");
+}
+
+TEST_F(ExchangeAuthTest, TestSessionTokenManagement) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/session_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator session_auth("NSE");
+    EXPECT_TRUE(session_auth.initialize(*config));
+    
+    // Test session token operations
+    EXPECT_TRUE(session_auth.refresh_session_token());
+    
+    auto credentials = session_auth.get_credentials();
+    EXPECT_FALSE(credentials.session_token.empty());
+    auto now = std::chrono::system_clock::now();
+    EXPECT_GT(credentials.token_expiry, now);
+}
+
+TEST_F(ExchangeAuthTest, TestAuthenticationFailure) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/bad_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator bad_auth("NSE");
+    EXPECT_FALSE(bad_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, TestMultipleExchanges) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/multi_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator nse_auth("NSE");
+    goldearn::network::ExchangeAuthenticator bse_auth("BSE");
+    
+    EXPECT_TRUE(nse_auth.initialize(*config));
+    EXPECT_TRUE(bse_auth.initialize(*config));
+    
+    auto nse_creds = nse_auth.get_credentials();
+    auto bse_creds = bse_auth.get_credentials();
+    
+    EXPECT_NE(nse_creds.api_key, bse_creds.api_key);
+    EXPECT_NE(nse_creds.secret_key, bse_creds.secret_key);
+}
+
+TEST_F(ExchangeAuthTest, TestInvalidExchangeName) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/valid_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator invalid_auth("INVALID");
+    EXPECT_FALSE(invalid_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, TestMissingCredentials) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/missing_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator missing_auth("NSE");
+    EXPECT_FALSE(missing_auth.initialize(*config));
+}
+
+TEST_F(ExchangeAuthTest, TestCredentialEncryption) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/encrypted_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator encrypted_auth("NSE");
+    EXPECT_TRUE(encrypted_auth.initialize(*config));
+    
+    auto credentials = encrypted_auth.get_credentials();
+    // Test that credentials were loaded (actual encryption test would need implementation)
+    EXPECT_FALSE(credentials.api_key.empty());
+}
+
+TEST_F(ExchangeAuthTest, TestTokenExpiry) {
+    auto config = ConfigManager::load_from_file(test_dir_ + "/expired_auth.conf");
+    ASSERT_TRUE(config);
+    
+    goldearn::network::ExchangeAuthenticator expired_auth("NSE");
+    EXPECT_TRUE(expired_auth.initialize(*config));
+    
+    auto credentials = expired_auth.get_credentials();
+    auto now = std::chrono::system_clock::now();
+    EXPECT_LT(credentials.token_expiry, now);
+    
+    // Should trigger token refresh
+    EXPECT_TRUE(expired_auth.refresh_session_token());
 }

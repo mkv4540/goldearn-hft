@@ -22,8 +22,3 @@ TEST_F(PrometheusMetricsTest, MetricsRecording) {
     std::string snapshot = metrics_collector->get_metrics_snapshot();
     EXPECT_FALSE(snapshot.empty());
 }
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

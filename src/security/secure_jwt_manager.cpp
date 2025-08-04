@@ -49,12 +49,13 @@ std::string SecureJWTManager::generate_token(const std::string& user_id,
         auto token = jwt::create()
             .set_issuer("goldearn-hft")
             .set_type("JWT")
-            .set_id(jwt_id)
+            .set_payload_claim("jti", jwt_id)
+            .set_payload_claim("user_id", user_id)
+            .set_payload_claim("role", role)
+            .set_payload_claim("key_version", std::to_string(key_version_))
+            .set_payload_claim("token_type", "access")
             .set_issued_at(now)
             .set_expires_at(exp_time)
-            .set_subject(user_id)
-            .set_payload_claim("role", jwt::claim(role))
-            .set_payload_claim("key_version", jwt::claim(std::to_string(key_version_)))
             .sign(jwt::algorithm::hs256{signing_key_});
         
         LOG_DEBUG("SecureJWTManager: Generated token for user: {} with role: {}", user_id, role);
@@ -76,12 +77,11 @@ std::string SecureJWTManager::generate_refresh_token(const std::string& user_id,
         auto token = jwt::create()
             .set_issuer("goldearn-hft")
             .set_type("refresh")
-            .set_id(jwt_id)
+            .set_payload_claim("jti", jwt_id)
+            .set_payload_claim("user_id", user_id)
+            .set_payload_claim("token_type", "refresh")
             .set_issued_at(now)
             .set_expires_at(exp_time)
-            .set_subject(user_id)
-            .set_payload_claim("token_type", jwt::claim("refresh"))
-            .set_payload_claim("key_version", jwt::claim(std::to_string(key_version_)))
             .sign(jwt::algorithm::hs256{signing_key_});
         
         LOG_DEBUG("SecureJWTManager: Generated refresh token for user: {}", user_id);
@@ -101,21 +101,31 @@ bool SecureJWTManager::validate_token(const std::string& token) {
         // Verify signature and claims
         verifier.verify(decoded);
         
-        // Check if token is blacklisted
-        std::string jti = decoded.get_id();
-        if (is_blacklisted(jti)) {
-            LOG_WARN("SecureJWTManager: Attempted to use blacklisted token: {}", jti);
+        // Verify token type
+        std::string token_type = decoded.get_payload_claim("token_type").as_string();
+        if (token_type != "access" && token_type != "refresh") {
+            LOG_ERROR("SecureJWTManager: Invalid token type");
             return false;
         }
         
-        // Verify key version matches
-        if (decoded.has_payload_claim("key_version")) {
-            std::string token_key_version = decoded.get_payload_claim("key_version").as_string();
-            if (token_key_version != std::to_string(key_version_)) {
-                LOG_WARN("SecureJWTManager: Token key version mismatch. Token: {}, Current: {}", 
-                        token_key_version, key_version_);
-                return false;
-            }
+        // Extract JTI for blacklist check
+        std::string jti = decoded.get_payload_claim("jti").as_string();
+        if (jti.empty()) {
+            LOG_ERROR("SecureJWTManager: Missing JTI in token");
+            return false;
+        }
+        
+        // Check blacklist
+        if (is_blacklisted(jti)) {
+            LOG_ERROR("SecureJWTManager: Token is blacklisted");
+            return false;
+        }
+        
+        // Extract user information
+        std::string user_id = decoded.get_payload_claim("user_id").as_string();
+        if (user_id.empty()) {
+            LOG_ERROR("SecureJWTManager: Missing user_id in token");
+            return false;
         }
         
         return true;
@@ -136,12 +146,16 @@ bool SecureJWTManager::validate_token(const std::string& token, std::string& use
     
     try {
         auto decoded = jwt::decode(token);
-        user_id = decoded.get_subject();
+        // Extract user information
+        user_id = decoded.get_payload_claim("user_id").as_string();
+        if (user_id.empty()) {
+            LOG_ERROR("SecureJWTManager: Missing user_id in token");
+            return false;
+        }
         
-        if (decoded.has_payload_claim("role")) {
+        // Extract role if present
+        if (!decoded.get_payload_claim("role").as_string().empty()) {
             role = decoded.get_payload_claim("role").as_string();
-        } else {
-            role = "user"; // Default role
         }
         
         return true;
@@ -160,21 +174,21 @@ std::string SecureJWTManager::refresh_access_token(const std::string& refresh_to
         verifier.verify(decoded);
         
         // Check if it's actually a refresh token
-        if (!decoded.has_payload_claim("token_type") ||
-            decoded.get_payload_claim("token_type").as_string() != "refresh") {
+        std::string token_type = decoded.get_payload_claim("token_type").as_string();
+        if (token_type != "refresh") {
             LOG_WARN("SecureJWTManager: Invalid refresh token type");
             return "";
         }
         
         // Check blacklist
-        std::string jti = decoded.get_id();
+        std::string jti = decoded.get_payload_claim("jti").as_string();
         if (is_blacklisted(jti)) {
             LOG_WARN("SecureJWTManager: Attempted to use blacklisted refresh token: {}", jti);
             return "";
         }
         
         // Extract user information
-        std::string user_id = decoded.get_subject();
+        std::string user_id = decoded.get_payload_claim("user_id").as_string();
         
         // Generate new access token (1 hour expiry)
         return generate_token(user_id, "user", std::chrono::hours(1));
@@ -188,7 +202,7 @@ std::string SecureJWTManager::refresh_access_token(const std::string& refresh_to
 void SecureJWTManager::revoke_token(const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
-        std::string jti = decoded.get_id();
+        std::string jti = decoded.get_payload_claim("jti").as_string();
         
         add_to_blacklist(jti);
         LOG_INFO("SecureJWTManager: Revoked token: {}", jti);
@@ -245,34 +259,24 @@ void SecureJWTManager::set_signing_algorithm(const std::string& algorithm) {
     }
 }
 
-std::string SecureJWTManager::get_user_id_from_token(const std::string& token) {
-    if (!validate_token(token)) {
-        return "";
-    }
-    
+std::string SecureJWTManager::get_user_id(const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
-        return decoded.get_subject();
+        return decoded.get_payload_claim("user_id").as_string();
     } catch (const std::exception& e) {
-        LOG_ERROR("SecureJWTManager: Error extracting user ID: {}", e.what());
+        LOG_ERROR("SecureJWTManager: Failed to extract user_id from token: {}", e.what());
         return "";
     }
 }
 
-std::string SecureJWTManager::get_role_from_token(const std::string& token) {
-    if (!validate_token(token)) {
-        return "";
-    }
-    
+std::string SecureJWTManager::get_user_role(const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
-        if (decoded.has_payload_claim("role")) {
-            return decoded.get_payload_claim("role").as_string();
-        }
-        return "user"; // Default role
+        std::string role = decoded.get_payload_claim("role").as_string();
+        return role.empty() ? "user" : role;
     } catch (const std::exception& e) {
-        LOG_ERROR("SecureJWTManager: Error extracting role: {}", e.what());
-        return "";
+        LOG_ERROR("SecureJWTManager: Failed to extract role from token: {}", e.what());
+        return "user";
     }
 }
 
@@ -282,6 +286,23 @@ std::chrono::system_clock::time_point SecureJWTManager::get_expiry_from_token(co
         return decoded.get_expires_at();
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Error extracting expiry: {}", e.what());
+        return std::chrono::system_clock::time_point{};
+    }
+}
+
+std::chrono::system_clock::time_point SecureJWTManager::get_expiration_time(const std::string& token) {
+    try {
+        auto decoded = jwt::decode(token);
+        auto exp_claim = decoded.get_payload_claim("exp");
+        if (exp_claim.empty()) {
+            return std::chrono::system_clock::time_point{};
+        }
+        
+        // Convert from timestamp to time_point
+        auto exp_time = std::chrono::system_clock::from_time_t(exp_claim.as_int());
+        return exp_time;
+    } catch (const std::exception& e) {
+        LOG_ERROR("SecureJWTManager: Failed to extract expiration time: {}", e.what());
         return std::chrono::system_clock::time_point{};
     }
 }

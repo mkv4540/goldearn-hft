@@ -169,7 +169,7 @@ private:
     
     // Risk limits
     std::unordered_map<std::pair<std::string, uint64_t>, double, 
-                      boost::hash<std::pair<std::string, uint64_t>>> position_limits_;
+                      std::hash<std::pair<std::string, uint64_t>>> position_limits_;
     std::unordered_map<std::string, double> strategy_exposure_limits_;
     std::unordered_map<uint64_t, double> symbol_exposure_limits_;
     double total_exposure_limit_;
@@ -264,7 +264,7 @@ public:
     
     // Correlation analysis
     std::unordered_map<std::pair<uint64_t, uint64_t>, double, 
-                      boost::hash<std::pair<uint64_t, uint64_t>>> calculate_position_correlations() const;
+                      std::hash<std::pair<uint64_t, uint64_t>>> calculate_position_correlations() const;
     
 private:
     const PositionManager* position_manager_;

@@ -304,6 +304,10 @@ public:
     // Get current metrics snapshot
     std::string get_metrics_snapshot() const;
     
+    // Additional methods that are implemented in .cpp file
+    double get_current_cpu_usage();
+    double get_current_memory_usage();
+    
 private:
     void collection_thread_func();
     void update_system_metrics();

@@ -109,39 +109,71 @@ double LatencyTracker::get_p99_latency_ns() const {
 }
 
 double LatencyTracker::get_max_latency_ns() const {
-    uint64_t count = sample_count_.load();
-    if (count == 0) return 0.0;
+    uint64_t sample_count = sample_count_.load();
+    if (sample_count == 0) return 0.0;
     
-    size_t samples_to_read = std::min(count, static_cast<uint64_t>(MAX_SAMPLES));
-    uint64_t max_val = 0;
+    size_t samples_to_read = std::min(sample_count, static_cast<uint64_t>(MAX_SAMPLES));
+    std::vector<uint64_t> sorted_samples(samples_to_read);
     
+    // Copy samples to vector
     for (size_t i = 0; i < samples_to_read; ++i) {
-        max_val = std::max(max_val, samples_[i]);
+        sorted_samples[i] = samples_[i];
     }
     
-    return static_cast<double>(max_val);
+    // Sort to find max
+    std::sort(sorted_samples.begin(), sorted_samples.end());
+    return static_cast<double>(sorted_samples.back());
 }
 
 double LatencyTracker::get_min_latency_ns() const {
-    uint64_t count = sample_count_.load();
-    if (count == 0) return 0.0;
+    uint64_t sample_count = sample_count_.load();
+    if (sample_count == 0) return 0.0;
     
-    size_t samples_to_read = std::min(count, static_cast<uint64_t>(MAX_SAMPLES));
-    uint64_t min_val = UINT64_MAX;
+    size_t samples_to_read = std::min(sample_count, static_cast<uint64_t>(MAX_SAMPLES));
+    std::vector<uint64_t> sorted_samples(samples_to_read);
     
+    // Copy samples to vector
     for (size_t i = 0; i < samples_to_read; ++i) {
-        min_val = std::min(min_val, samples_[i]);
+        sorted_samples[i] = samples_[i];
     }
     
-    return static_cast<double>(min_val);
+    // Sort to find min
+    std::sort(sorted_samples.begin(), sorted_samples.end());
+    return static_cast<double>(sorted_samples.front());
+}
+
+LatencyTracker::LatencyStats LatencyTracker::get_stats() const {
+    LatencyStats stats;
+    stats.count = get_sample_count();
+    
+    if (stats.count == 0) {
+        stats.avg_latency_us = 0.0;
+        stats.min_latency_us = 0.0;
+        stats.p50_latency_us = 0.0;
+        stats.p95_latency_us = 0.0;
+        stats.p99_latency_us = 0.0;
+        stats.max_latency_us = 0.0;
+        return stats;
+    }
+    
+    // Convert nanoseconds to microseconds
+    stats.avg_latency_us = get_mean_latency_ns() / 1000.0;
+    stats.min_latency_us = get_min_latency_ns() / 1000.0;
+    stats.p50_latency_us = get_median_latency_ns() / 1000.0;
+    stats.p95_latency_us = get_p95_latency_ns() / 1000.0;
+    stats.p99_latency_us = get_p99_latency_ns() / 1000.0;
+    stats.max_latency_us = get_max_latency_ns() / 1000.0;
+    
+    return stats;
 }
 
 void LatencyTracker::reset() {
     write_index_.store(0);
     sample_count_.store(0);
-    samples_.fill(0);
-    start_time_ = TimePoint{};
+    std::fill(samples_.begin(), samples_.end(), 0);
 }
+
+// start_timing() and end_timing() are already defined inline in the header file
 
 // LatencyMonitor implementation
 LatencyTracker* LatencyMonitor::create_tracker(const std::string& name) {
@@ -200,13 +232,13 @@ void LatencyMonitor::print_latency_report() const {
     printf("--------------------------------------------------------------------------------\n");
     
     for (const auto& stat : stats) {
-        printf("%-20s %10.1f %10.1f %10.1f %10.1f %10lu\n",
+        printf("%-20s %10.1f %10.1f %10.1f %10.1f %10llu\n",
                stat.component_name.c_str(),
                stat.mean_ns,
                stat.p95_ns,
                stat.p99_ns,
                stat.max_ns,
-               stat.sample_count);
+               static_cast<unsigned long long>(stat.sample_count));
     }
 }
 
@@ -223,8 +255,8 @@ void LatencyMonitor::check_thresholds() const {
         if (it != trackers_.end()) {
             double mean_latency = it->second->get_mean_latency_ns();
             if (mean_latency > threshold) {
-                printf("WARNING: Tracker '%s' mean latency %.1fns exceeds threshold %luns\n",
-                       name.c_str(), mean_latency, threshold);
+                printf("WARNING: Tracker '%s' mean latency %.1fns exceeds threshold %lluns\n",
+                       name.c_str(), mean_latency, static_cast<unsigned long long>(threshold));
             }
         }
     }

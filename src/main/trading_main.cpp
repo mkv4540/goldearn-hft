@@ -43,56 +43,61 @@ public:
     bool initialize(const std::string& config_file) {
         LOG_INFO("Loading configuration from: {}", config_file);
         
-        // Load configuration
-        auto& config = config::ConfigManager::instance();
-        if (!config.load_from_file(config_file)) {
-            LOG_ERROR("Failed to load configuration file: {}", config_file);
-            return false;
-        }
-        
-        // Load environment variables
-        config.load_from_environment();
-        
-        // Validate configuration
-        if (!config.validate()) {
-            LOG_ERROR("Configuration validation failed");
-            return false;
-        }
-        
-        // Check if we're in production mode with invalid endpoints
-        if (config.is_production()) {
-            if (!config::ProductionConfig::validate_production_config(config)) {
-                LOG_ERROR("Production configuration validation failed");
+        try {
+            // Load configuration
+            auto config = config::ConfigManager::load_from_file(config_file);
+            if (!config) {
+                LOG_ERROR("Failed to load configuration file: {}", config_file);
+                return 1;
+            }
+            
+            // Load environment variables
+            config->load_from_environment();
+            
+            // Validate configuration
+            if (!config->validate()) {
+                LOG_ERROR("Configuration validation failed");
+                return 1;
+            }
+            
+            // Production configuration validation
+            if (config->is_production()) {
+                if (!config::ProductionConfig::validate_production_config(*config)) {
+                    LOG_ERROR("Production configuration validation failed");
+                    return 1;
+                }
+            }
+            
+            // Initialize market data
+            if (!init_market_data(*config)) {
+                LOG_ERROR("Failed to initialize market data");
+                return 1;
+            }
+            
+            // Initialize order books
+            if (!init_order_books()) {
+                LOG_ERROR("Failed to initialize order books");
                 return false;
             }
-        }
-        
-        // Initialize market data feed
-        if (!init_market_data(config)) {
-            LOG_ERROR("Failed to initialize market data feed");
+            
+            // Initialize risk management
+            if (!init_risk_management()) {
+                LOG_ERROR("Failed to initialize risk management");
+                return false;
+            }
+            
+            // Initialize trading strategies
+            if (!init_strategies()) {
+                LOG_ERROR("Failed to initialize trading strategies");
+                return false;
+            }
+            
+            LOG_INFO("Trading engine initialized successfully");
+            return true;
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error during engine initialization: {}", e.what());
             return false;
         }
-        
-        // Initialize order books
-        if (!init_order_books()) {
-            LOG_ERROR("Failed to initialize order books");
-            return false;
-        }
-        
-        // Initialize risk management
-        if (!init_risk_management()) {
-            LOG_ERROR("Failed to initialize risk management");
-            return false;
-        }
-        
-        // Initialize trading strategies
-        if (!init_strategies()) {
-            LOG_ERROR("Failed to initialize trading strategies");
-            return false;
-        }
-        
-        LOG_INFO("Trading engine initialized successfully");
-        return true;
     }
     
     void run() {
@@ -258,7 +263,7 @@ private:
     
     void print_statistics() {
         LOG_INFO("=== Trading Session Statistics ===");
-        LOG_INFO("Daily P&L: {:.2f} INR", current_daily_pnl_);
+        LOG_INFO("Daily P&L: {:.2f} INR", current_daily_pnl_.load());
         LOG_INFO("Messages processed: {}", 
                  nse_parser_ ? nse_parser_->get_messages_processed() : 0);
         
@@ -279,7 +284,8 @@ private:
         // TODO: Implement trade processing
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
     }
     
     void handle_quote_message(const market_data::MessageHeader& header, const void* data) {
@@ -289,7 +295,8 @@ private:
         // TODO: Implement quote processing
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
     }
     
 private:
@@ -311,7 +318,8 @@ int main(int argc, char* argv[]) {
     print_banner();
     
     // Initialize logger
-    utils::Logger::init("goldearn_engine.log");
+    // utils::Logger::init("goldearn_engine.log");
+    LOG_INFO("Starting GoldEarn Trading Engine...");
     LOG_INFO("GoldEarn HFT Trading Engine starting");
     
     // Parse command line arguments

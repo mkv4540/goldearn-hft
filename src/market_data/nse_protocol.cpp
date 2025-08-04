@@ -45,12 +45,11 @@ NSEProtocolParser::NSEProtocolParser()
     buffer_ = new uint8_t[BUFFER_SIZE];
     std::memset(buffer_, 0, BUFFER_SIZE);
     
-    // Initialize rate limiters
-    // 10,000 messages per second limit
-    message_rate_limiter_ = std::make_unique<core::RateLimiter>(10000, 10000);
-    // 10 connections per minute
-    connection_rate_limiter_ = std::make_unique<core::SlidingWindowRateLimiter>(
-        10, std::chrono::minutes(1));
+    // Initialize rate limiters - commented out as RateLimiter not implemented yet
+    // TODO: Implement rate limiters
+    // message_rate_limiter_ = std::make_unique<core::RateLimiter>(10000, 10000);
+    // connection_rate_limiter_ = std::make_unique<core::SlidingWindowRateLimiter>(
+    //     10, std::chrono::minutes(1));
 }
 
 NSEProtocolParser::~NSEProtocolParser() {
@@ -470,11 +469,12 @@ void NSEProtocolParser::set_order_callback(MessageCallback callback) {
 
 bool NSEProtocolParser::connect_to_feed(const std::string& host, uint16_t port) {
     try {
-        // Check connection rate limit
-        if (!connection_rate_limiter_->try_acquire()) {
-            LOG_ERROR("NSEProtocolParser: Connection rate limit exceeded");
-            return false;
-        }
+        // Rate limiting checks
+        // TODO: Implement rate limiters
+        // if (!message_rate_limiter_->try_acquire()) {
+        //     LOG_ERROR("NSEProtocolParser: Connection rate limit exceeded");
+        //     return false;
+        // }
         
         // Close existing connection if any
         if (socket_fd_ >= 0) {
@@ -659,11 +659,11 @@ void NSEProtocolParser::receive_thread_func() {
             break;
         }
         
-        // Check message rate limit
-        if (!message_rate_limiter_->try_acquire()) {
-            LOG_WARN("NSEProtocolParser: Message rate limit exceeded, dropping data");
-            continue;
-        }
+        // Check message rate limit - TODO: Implement when rate limiter is available
+        // if (!message_rate_limiter_->try_acquire()) {
+        //     LOG_WARN("NSEProtocolParser: Message rate limit exceeded, dropping data");
+        //     continue;
+        // }
         
         // Parse received data
         size_t parsed = parse_buffer(recv_buffer, bytes_received);

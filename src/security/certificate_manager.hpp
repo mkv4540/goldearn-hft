@@ -8,6 +8,7 @@
 #include <mutex>
 #include <vector>
 #include <functional>
+#include <unordered_map>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>

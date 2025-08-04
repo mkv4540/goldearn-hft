@@ -120,7 +120,7 @@ private:
         if (!symbol_manager_) return;
         
         for (size_t i = 0; i < symbol_manager_->get_symbol_count(); ++i) {
-            const auto* info = symbol_manager_->get_symbol_by_index(i);
+            const auto* info = symbol_manager_->get_symbol_info(i);
             if (info) {
                 order_books_[info->symbol_name] = 
                     std::make_unique<market_data::OrderBook>(info->symbol_name);
@@ -137,10 +137,10 @@ private:
         // Update statistics
         trade_count_++;
         total_trade_volume_ += trade_msg->quantity;
-        total_trade_value_ += trade_msg->price * trade_msg->quantity;
+        total_trade_value_ = total_trade_value_.load() + (trade_msg->price * trade_msg->quantity);
         
         // Get symbol name
-        const auto* symbol_info = symbol_manager_->get_symbol_by_id(trade_msg->symbol_id);
+        const auto* symbol_info = symbol_manager_->get_symbol_info(trade_msg->symbol_id);
         if (!symbol_info) {
             LOG_WARN("Unknown symbol ID in trade: {}", trade_msg->symbol_id);
             return;
@@ -152,80 +152,84 @@ private:
             // Trade updates might affect the order book state
             LOG_DEBUG("Trade: {} - Price: {}, Qty: {}, Side: {}", 
                      symbol_info->symbol_name, trade_msg->price, 
-                     trade_msg->quantity, trade_msg->side);
+                     trade_msg->quantity, 'T');
         }
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
     }
     
     void handle_quote_message(const market_data::MessageHeader& header, const void* data) {
         auto start = std::chrono::high_resolution_clock::now();
         
-        const auto* quote_msg = static_cast<const market_data::QuoteMessage*>(data);
-        
-        // Update statistics
-        quote_count_++;
-        
-        // Get symbol name
-        const auto* symbol_info = symbol_manager_->get_symbol_by_id(quote_msg->symbol_id);
-        if (!symbol_info) {
-            LOG_WARN("Unknown symbol ID in quote: {}", quote_msg->symbol_id);
-            return;
-        }
-        
-        // Update order book
-        auto it = order_books_.find(symbol_info->symbol_name);
-        if (it != order_books_.end()) {
-            it->second->update_quote(
-                quote_msg->bid_price, quote_msg->bid_quantity,
-                quote_msg->ask_price, quote_msg->ask_quantity
-            );
+        try {
+            auto quote_msg = nse_parser_->parse_nse_quote(static_cast<const uint8_t*>(data));
             
-            LOG_DEBUG("Quote: {} - Bid: {}@{}, Ask: {}@{}", 
-                     symbol_info->symbol_name,
-                     quote_msg->bid_price, quote_msg->bid_quantity,
-                     quote_msg->ask_price, quote_msg->ask_quantity);
+            // Get symbol information
+            const auto* symbol_info = symbol_manager_->get_symbol_info(quote_msg.symbol_id);
+            if (!symbol_info) {
+                LOG_WARNING("Unknown symbol ID: {}", quote_msg.symbol_id);
+                return;
+            }
+            
+            // Update order book
+            auto& order_book = order_books_[symbol_info->symbol_name];
+            if (!order_book) {
+                order_book = std::make_unique<market_data::OrderBook>(symbol_info->symbol_name);
+            }
+            
+            // Create QuoteMessage object and update order book
+            market_data::QuoteMessage quote;
+            quote.symbol_id = quote_msg.symbol_id;
+            quote.bid_price = quote_msg.bid_price;
+            quote.bid_quantity = quote_msg.bid_quantity;
+            quote.ask_price = quote_msg.ask_price;
+            quote.ask_quantity = quote_msg.ask_quantity;
+            quote.quote_time = quote_msg.quote_time;
+            
+            order_book->update_quote(quote);
+            quote_count_++;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error processing quote message: {}", e.what());
         }
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
     }
     
     void handle_order_message(const market_data::MessageHeader& header, const void* data) {
         auto start = std::chrono::high_resolution_clock::now();
         
-        const auto* order_msg = static_cast<const market_data::OrderUpdateMessage*>(data);
-        
-        // Update statistics
-        order_update_count_++;
-        
-        // Get symbol name
-        const auto* symbol_info = symbol_manager_->get_symbol_by_id(order_msg->symbol_id);
-        if (!symbol_info) {
-            LOG_WARN("Unknown symbol ID in order update: {}", order_msg->symbol_id);
-            return;
-        }
-        
-        // Update order book
-        auto it = order_books_.find(symbol_info->symbol_name);
-        if (it != order_books_.end()) {
-            if (order_msg->update_type == market_data::OrderUpdateType::NEW) {
-                it->second->add_order(
-                    order_msg->order_id,
-                    order_msg->side == 'B' ? market_data::Side::BUY : market_data::Side::SELL,
-                    order_msg->price,
-                    order_msg->quantity
-                );
-            } else if (order_msg->update_type == market_data::OrderUpdateType::CANCEL) {
-                it->second->remove_order(order_msg->order_id);
-            } else if (order_msg->update_type == market_data::OrderUpdateType::MODIFY) {
-                it->second->modify_order(order_msg->order_id, order_msg->new_quantity);
+        try {
+            auto order_msg = nse_parser_->parse_nse_order(static_cast<const uint8_t*>(data));
+            
+            // Get symbol information
+            const auto* symbol_info = symbol_manager_->get_symbol_info(order_msg.symbol_id);
+            if (!symbol_info) {
+                LOG_WARNING("Unknown symbol ID: {}", order_msg.symbol_id);
+                return;
             }
+            
+            // Update order book
+            auto& order_book = order_books_[symbol_info->symbol_name];
+            if (!order_book) {
+                order_book = std::make_unique<market_data::OrderBook>(symbol_info->symbol_name);
+            }
+            
+            // Add order to order book with timestamp
+            order_book->add_order(order_msg.order_id, order_msg.order_type, order_msg.price, order_msg.quantity, order_msg.order_time);
+            order_update_count_++;
+            
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error processing order message: {}", e.what());
         }
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
     }
     
     void print_statistics() {
@@ -233,9 +237,9 @@ private:
         LOG_INFO("Messages processed: {}", nse_parser_->get_messages_processed());
         LOG_INFO("Parse errors: {}", nse_parser_->get_parse_errors());
         LOG_INFO("Trades: {}, Volume: {}, Value: {:.2f}", 
-                 trade_count_, total_trade_volume_, total_trade_value_);
-        LOG_INFO("Quotes: {}", quote_count_);
-        LOG_INFO("Order updates: {}", order_update_count_);
+                 trade_count_.load(), total_trade_volume_.load(), total_trade_value_.load());
+        LOG_INFO("Quotes: {}", quote_count_.load());
+        LOG_INFO("Order updates: {}", order_update_count_.load());
         
         auto stats = latency_tracker_.get_stats();
         LOG_INFO("Processing latency - Avg: {:.2f}μs, P99: {:.2f}μs", 
@@ -281,8 +285,7 @@ private:
 };
 
 int main(int argc, char* argv[]) {
-    // Initialize logger
-    utils::Logger::init("goldearn_feed_handler.log");
+    // Initialize logger - use SimpleLogger instead of Logger
     LOG_INFO("GoldEarn HFT Feed Handler starting");
     
     // Parse command line arguments
@@ -332,7 +335,7 @@ int main(int argc, char* argv[]) {
     
     // Shutdown
     handler.shutdown();
+    LOG_INFO("Feed handler shutdown complete");
     
-    LOG_INFO("GoldEarn HFT Feed Handler terminated");
     return 0;
 }

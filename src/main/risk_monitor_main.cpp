@@ -164,7 +164,8 @@ public:
         }
         
         auto end = std::chrono::high_resolution_clock::now();
-        latency_tracker_.record_latency(start, end);
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start);
+        latency_tracker_.record_latency(duration);
         
         return approved;
     }
@@ -253,7 +254,9 @@ private:
     
     void generate_risk_report() {
         std::cout << "\n=== Risk Monitor Report ===" << std::endl;
-        std::cout << "Timestamp: " << std::chrono::system_clock::now() << std::endl;
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
+        std::cout << "Timestamp: " << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S") << std::endl;
         std::cout << "\nPortfolio Metrics:" << std::endl;
         std::cout << "  Portfolio Value: " << std::fixed << std::setprecision(2) 
                   << metrics_.current_portfolio_value.load() << " INR" << std::endl;
@@ -306,7 +309,8 @@ private:
 
 int main(int argc, char* argv[]) {
     // Initialize logger
-    utils::Logger::init("goldearn_risk_monitor.log");
+    // utils::Logger::init("goldearn_risk_monitor.log");
+    LOG_INFO("Starting GoldEarn Risk Monitor...");
     LOG_INFO("GoldEarn HFT Risk Monitor starting");
     
     // Parse command line arguments

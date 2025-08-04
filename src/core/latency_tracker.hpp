@@ -20,6 +20,17 @@ public:
     
     static constexpr size_t MAX_SAMPLES = 10000; // Ring buffer for samples
     
+    // Statistics structure for compatibility with existing code
+    struct LatencyStats {
+        uint64_t count;
+        double avg_latency_us;
+        double min_latency_us;
+        double p50_latency_us;
+        double p95_latency_us;
+        double p99_latency_us;
+        double max_latency_us;
+    };
+    
     LatencyTracker(const std::string& name);
     ~LatencyTracker();
     
@@ -35,8 +46,8 @@ public:
     };
     
     // Manual timing
-    void start_timing() { start_time_ = now(); }
-    void end_timing() { record_latency(now() - start_time_); }
+    void start_timing() { timing_start_ = now(); }
+    void end_timing() { record_latency(now() - timing_start_); }
     
     // Record external latency
     void record_latency(Duration latency);
@@ -52,6 +63,9 @@ public:
     
     // Sample count
     uint64_t get_sample_count() const { return sample_count_.load(); }
+    
+    // Get comprehensive statistics
+    LatencyStats get_stats() const;
     
     // Reset statistics
     void reset();
@@ -80,6 +94,7 @@ private:
     std::atomic<size_t> write_index_;
     std::atomic<uint64_t> sample_count_;
     TimePoint start_time_;
+    TimePoint timing_start_; // For manual timing
     
     void update_statistics();
 };
@@ -142,17 +157,35 @@ public:
     // Calibrate TSC frequency
     void calibrate();
     
-    // TSC-based timing (fastest possible on x86)
+    // TSC-based timing (platform specific)
     uint64_t rdtsc() const {
+#if defined(__x86_64__) || defined(__i386__)
         uint32_t lo, hi;
         __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
         return ((uint64_t)hi << 32) | lo;
+#elif defined(__aarch64__)
+        uint64_t val;
+        __asm__ __volatile__("mrs %0, cntvct_el0" : "=r"(val));
+        return val;
+#else
+        auto now = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+#endif
     }
     
     uint64_t rdtscp() const {
+#if defined(__x86_64__) || defined(__i386__)
         uint32_t lo, hi, aux;
         __asm__ __volatile__("rdtscp" : "=a"(lo), "=d"(hi), "=c"(aux));
         return ((uint64_t)hi << 32) | lo;
+#elif defined(__aarch64__)
+        uint64_t val;
+        __asm__ __volatile__("isb; mrs %0, cntvct_el0" : "=r"(val));
+        return val;
+#else
+        auto now = std::chrono::high_resolution_clock::now();
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
+#endif
     }
     
     // Convert TSC cycles to nanoseconds

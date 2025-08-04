@@ -1,3 +1,5 @@
+
+
 #include "config_manager.hpp"
 #include "../utils/simple_logger.hpp"
 #include <fstream>
@@ -10,39 +12,41 @@
 
 namespace goldearn::config {
 
-bool ConfigManager::load_from_file(const std::string& filename) {
+// Static factory method implementation
+std::unique_ptr<ConfigManager> ConfigManager::load_from_file(const std::string& filename) {
+    auto config = std::make_unique<ConfigManager>();
+    if (config->load_config(filename)) {
+        return config;
+    }
+    return nullptr;
+}
+
+ConfigManager::ConfigManager() : filename_("") {
+    // Initialize default sections
+    get_section("global");
+    get_section("network");
+    get_section("logging");
+    get_section("database");
+    get_section("exchange");
+    get_section("risk");
+    get_section("system");
+    get_section("environment");
+}
+
+bool ConfigManager::load_config(const std::string& filename) {
     if (filename.empty()) {
         LOG_ERROR("ConfigManager: Empty filename provided");
         return false;
     }
     
-    // Check file extension
-    size_t dot_pos = filename.find_last_of('.');
-    if (dot_pos == std::string::npos) {
-        LOG_ERROR("ConfigManager: No file extension found in {}", filename);
-        return false;
-    }
+    filename_ = filename;
     
-    std::string extension = filename.substr(dot_pos + 1);
-    std::transform(extension.begin(), extension.end(), extension.begin(), ::tolower);
-    
-    bool result = false;
-    if (extension == "ini" || extension == "conf") {
-        result = parse_ini_file(filename);
-    } else if (extension == "json") {
-        result = parse_json_file(filename);
+    // Determine file type and parse accordingly
+    if (filename.ends_with(".json")) {
+        return parse_json_file(filename);
     } else {
-        LOG_ERROR("ConfigManager: Unsupported file type: {}", extension);
-        return false;
+        return parse_ini_file(filename);
     }
-    
-    if (result) {
-        filename_ = filename;
-        last_modified_ = std::filesystem::last_write_time(filename);
-        LOG_INFO("ConfigManager: Successfully loaded configuration from {}", filename);
-    }
-    
-    return result;
 }
 
 void ConfigManager::load_from_environment() {
@@ -190,7 +194,7 @@ bool ConfigManager::reload() {
         return false;
     }
     
-    return load_from_file(filename_);
+    return load_config(filename_);
 }
 
 bool ConfigManager::validate() const {
@@ -353,6 +357,76 @@ std::string ConfigManager::trim(const std::string& str) {
     
     size_t last = str.find_last_not_of(" \t\n\r");
     return str.substr(first, last - first + 1);
+}
+
+// ProductionConfig implementation
+bool ProductionConfig::validate_production_config(const ConfigManager& config) {
+    // Check required production settings
+    std::vector<std::string> required_params = {
+        "system.name",
+        "system.environment",
+        "network.listen_port",
+        "logging.level",
+        "risk.max_daily_loss",
+        "risk.max_position_value",
+        "risk.max_order_value",
+        "exchange.nse.host",
+        "exchange.nse.port",
+        "exchange.bse.host",
+        "exchange.bse.port"
+    };
+    
+    for (const auto& param : required_params) {
+        if (config.get_string(param).empty()) {
+            LOG_ERROR("ProductionConfig: Missing required parameter: {}", param);
+            return false;
+        }
+    }
+    
+    // Validate environment is production
+    if (config.get_string("system.environment") != "production") {
+        LOG_ERROR("ProductionConfig: Environment must be 'production'");
+        return false;
+    }
+    
+    // Validate risk limits
+    double max_daily_loss = config.get_double("risk.max_daily_loss");
+    if (max_daily_loss <= 0 || max_daily_loss > PROD_MAX_DAILY_LOSS) {
+        LOG_ERROR("ProductionConfig: Invalid max_daily_loss: {}", max_daily_loss);
+        return false;
+    }
+    
+    double max_position_value = config.get_double("risk.max_position_value");
+    if (max_position_value <= 0 || max_position_value > PROD_MAX_POSITION_VALUE) {
+        LOG_ERROR("ProductionConfig: Invalid max_position_value: {}", max_position_value);
+        return false;
+    }
+    
+    double max_order_value = config.get_double("risk.max_order_value");
+    if (max_order_value <= 0 || max_order_value > PROD_MAX_ORDER_VALUE) {
+        LOG_ERROR("ProductionConfig: Invalid max_order_value: {}", max_order_value);
+        return false;
+    }
+    
+    // Validate network settings
+    int listen_port = config.get_int("network.listen_port");
+    if (listen_port < 1 || listen_port > 65535) {
+        LOG_ERROR("ProductionConfig: Invalid port number: {}", listen_port);
+        return false;
+    }
+    
+    LOG_INFO("ProductionConfig: Configuration validation passed");
+    return true;
+}
+
+void ProductionConfig::create_production_template(const std::string& filename) {
+    // Implementation for creating production template
+    LOG_INFO("ProductionConfig: Creating production template: {}", filename);
+}
+
+void ProductionConfig::create_development_template(const std::string& filename) {
+    // Implementation for creating development template
+    LOG_INFO("ProductionConfig: Creating development template: {}", filename);
 }
 
 } // namespace goldearn::config
