@@ -25,7 +25,8 @@
       "Bash(ls:*)",
       "Bash(../run_tests.sh)",
       "Bash(/Users/manishkumar/Desktop/gitlocal/api_python3/learn_genius_quiz/goldearn-hft/setup_test_configs.sh)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
