@@ -1,17 +1,15 @@
 #include <gtest/gtest.h>
+#include "../src/risk/risk_engine.hpp"
 
-// Placeholder risk engine test
 class RiskEngineTest : public ::testing::Test {
 protected:
-    void SetUp() override {}
+    void SetUp() override {
+        risk_engine = std::make_unique<goldearn::risk::RiskEngine>();
+    }
+    
+    std::unique_ptr<goldearn::risk::RiskEngine> risk_engine;
 };
 
 TEST_F(RiskEngineTest, BasicFunctionality) {
-    // Placeholder test - risk engine not implemented yet
-    EXPECT_TRUE(true);
-}
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    EXPECT_NE(risk_engine, nullptr);
 }

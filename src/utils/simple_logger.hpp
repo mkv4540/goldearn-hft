@@ -35,7 +35,7 @@ private:
         }
     }
     
-    // Specialization for atomic types
+    // Explicit specialization for atomic types
     template<typename T>
     static std::string to_string(const std::atomic<T>& value) {
         return to_string(value.load());

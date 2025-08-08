@@ -56,8 +56,14 @@ public:
     // Refresh authentication token
     bool refresh_token();
     
+    // Refresh session token specifically
+    bool refresh_session_token() { return refresh_token(); }
+    
     // Set callback for authentication events
     void set_auth_callback(std::function<void(bool, const std::string&)> callback);
+    
+    // Get current credentials (for testing)
+    const AuthCredentials& get_credentials() const { return credentials_; }
     
 private:
     // Exchange-specific authentication implementations
@@ -66,6 +72,10 @@ private:
     bool authenticate_with_api_key();
     bool authenticate_with_certificate();
     bool authenticate_with_oauth2();
+    
+    // Helper methods for loading credentials
+    void load_nse_credentials(const config::ConfigManager& config);
+    void load_bse_credentials(const config::ConfigManager& config);
     
     // Token management
     bool is_token_expired() const;

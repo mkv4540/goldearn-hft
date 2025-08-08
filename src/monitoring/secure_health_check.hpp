@@ -63,10 +63,13 @@ public:
 private:
     std::string hash_api_key(const std::string& api_key);
     std::string generate_random_key();
+    std::string calculate_hmac_signature(const std::string& data);
     
     std::unordered_set<std::string> valid_api_keys_;
     std::string jwt_secret_;
     mutable std::mutex mutex_;
+    
+    friend class SecureHealthCheckServer;
 };
 
 // Secure health check server with protection
@@ -78,7 +81,6 @@ public:
     // Security configuration
     void enable_authentication(bool enabled = true) { auth_enabled_ = enabled; }
     void enable_rate_limiting(bool enabled = true) { rate_limiting_enabled_ = enabled; }
-    void enable_input_validation(bool enabled = true) { input_validation_enabled_ = enabled; }
     void enable_https(const std::string& cert_path, const std::string& key_path);
     
     // Access control
@@ -89,6 +91,12 @@ public:
     // Security monitoring
     void log_security_event(const std::string& event, const std::string& client_ip);
     std::vector<std::string> get_security_events() const;
+    
+    // Public accessor methods for testing and monitoring
+    bool is_auth_enabled() const { return auth_enabled_; }
+    bool is_rate_limiting_enabled() const { return rate_limiting_enabled_; }
+    bool is_https_enabled() const { return https_enabled_; }
+    bool has_allowed_ips() const { return !allowed_ips_.empty(); }
     
 protected:
     std::string handle_request(const std::string& path, const std::string& method,
@@ -107,16 +115,17 @@ private:
     std::string extract_auth_header(const std::string& request);
     
 private:
-    // Security settings
+    // Authentication settings
     bool auth_enabled_ = true;
     bool rate_limiting_enabled_ = true;
-    bool input_validation_enabled_ = true;
+    std::string api_key_;
+    std::string secret_key_;
     bool https_enabled_ = false;
+    std::unordered_set<std::string> allowed_ips_;
     
     // Security components
     std::unique_ptr<RateLimiter> rate_limiter_;
     std::unique_ptr<MonitoringAuth> auth_;
-    std::unordered_set<std::string> allowed_ips_;
     
     // SSL context for HTTPS
     std::string ssl_cert_path_;

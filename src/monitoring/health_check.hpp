@@ -83,6 +83,8 @@ private:
     std::string format_metrics_response();
     HealthStatus determine_overall_status(const std::vector<ComponentHealth>& components);
     
+protected:
+    
 private:
     uint16_t port_;
     std::atomic<bool> running_{false};

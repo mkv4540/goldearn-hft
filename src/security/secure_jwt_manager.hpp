@@ -5,6 +5,7 @@
 #include <chrono>
 #include <memory>
 #include <unordered_set>
+#include <unordered_map>
 #include <mutex>
 
 namespace goldearn::security {
@@ -42,6 +43,11 @@ public:
     std::string get_user_id_from_token(const std::string& token);
     std::string get_role_from_token(const std::string& token);
     std::chrono::system_clock::time_point get_expiry_from_token(const std::string& token);
+    
+    // Token information extraction
+    std::string get_user_id(const std::string& token);
+    std::string get_user_role(const std::string& token);
+    std::chrono::system_clock::time_point get_expiration_time(const std::string& token);
     
     // Blacklist management
     void add_to_blacklist(const std::string& jti); // JWT ID

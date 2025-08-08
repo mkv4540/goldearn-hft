@@ -21,8 +21,3 @@ TEST_F(HealthCheckTest, StartStop) {
     health_server->stop();
     EXPECT_FALSE(health_server->is_running());
 }
-
-int main(int argc, char** argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}

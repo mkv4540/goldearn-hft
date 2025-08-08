@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <benchmark/benchmark.h>
+// #include <benchmark/benchmark.h> // Commented out - not available
 #include <chrono>
 #include <thread>
 #include <atomic>
@@ -14,6 +14,7 @@
 #include "../../src/monitoring/health_check.hpp"
 #include "../../src/monitoring/prometheus_metrics.hpp"
 #include "../../src/security/certificate_manager.hpp"
+#include "../../src/utils/simple_logger.hpp"
 
 using namespace goldearn;
 
@@ -22,7 +23,8 @@ class PerformanceRegressionTest : public ::testing::Test {
 protected:
     void SetUp() override {
         // Initialize components for performance testing
-        config_manager_ = std::make_unique<config::ConfigManager>();
+        // ConfigManager requires factory method
+        config_manager_ = config::ConfigManager::load_from_file("test_config.conf");
         nse_parser_ = std::make_unique<market_data::nse::NSEProtocolParser>();
         metrics_collector_ = std::make_unique<monitoring::HFTMetricsCollector>();
         

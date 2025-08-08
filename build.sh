@@ -13,12 +13,29 @@ command -v make >/dev/null 2>&1 || { echo "❌ Make is required but not installe
 # Set timeout for commands (20 minutes as requested)
 timeout_duration="20m"
 
+# Check if timeout command exists (macOS vs Linux)
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="timeout $timeout_duration"
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT_CMD="gtimeout $timeout_duration"
+else
+    echo "⚠️  Warning: timeout command not found. Running without timeout..."
+    TIMEOUT_CMD=""
+fi
+
+# Get number of cores (macOS vs Linux)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    NPROC=$(sysctl -n hw.ncpu)
+else
+    NPROC=$(nproc)
+fi
+
 echo "📂 Creating build directory..."
 mkdir -p build
 cd build
 
 echo "⚙️  Running CMake configuration..."
-timeout $timeout_duration cmake .. \
+$TIMEOUT_CMD cmake .. \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_TESTS=ON \
     -DBUILD_BENCHMARKS=ON \
@@ -26,10 +43,10 @@ timeout $timeout_duration cmake .. \
     || { echo "❌ CMake configuration failed"; exit 1; }
 
 echo "🔨 Building project (optimized for HFT)..."
-timeout $timeout_duration make -j$(nproc) || { echo "❌ Build failed"; exit 1; }
+$TIMEOUT_CMD make -j$NPROC || { echo "❌ Build failed"; exit 1; }
 
 echo "🧪 Running comprehensive test suite..."
-timeout $timeout_duration ctest --output-on-failure --parallel $(nproc) || { echo "⚠️  Some tests failed, but build completed"; }
+$TIMEOUT_CMD ctest --output-on-failure --parallel $NPROC || { echo "⚠️  Some tests failed, but build completed"; }
 
 echo ""
 echo "✅ Build completed successfully!"

@@ -121,6 +121,11 @@ target_link_libraries(test_performance
     GTest::gtest_main
 )
 
+# Link benchmark library if available
+if(TARGET benchmark::benchmark)
+    target_link_libraries(test_performance benchmark::benchmark)
+endif()
+
 # Add all tests to CTest
 add_test(NAME MarketDataTests COMMAND test_market_data)
 add_test(NAME TradingTests COMMAND test_trading)

@@ -121,15 +121,14 @@ private:
 // Main configuration manager
 class ConfigManager {
 public:
-    static ConfigManager& instance() {
-        static ConfigManager instance;
-        return instance;
-    }
+    // Constructor
+    ConfigManager();
     
-    // Load configuration from file
-    bool load_from_file(const std::string& filename);
+    // Static factory method for creating instances
+    static std::unique_ptr<ConfigManager> load_from_file(const std::string& filename);
     
-    // Load from environment variables
+    // Instance methods
+    bool load_config(const std::string& filename);
     void load_from_environment();
     
     // Get configuration section
@@ -260,8 +259,6 @@ public:
     }
     
 private:
-    ConfigManager() = default;
-    
     bool parse_ini_file(const std::string& filename);
     bool parse_json_file(const std::string& filename);
     std::string trim(const std::string& str);
