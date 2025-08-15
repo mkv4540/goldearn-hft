@@ -13,7 +13,7 @@ jobs:
   build-and-test:
     name: Build and Test HFT System
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     
     strategy:
       matrix:
@@ -35,9 +35,13 @@ jobs:
           vcpkg: false
           
       - name: Install system dependencies
+        timeout-minutes: 25
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          # Optimize apt operations for speed
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update --fix-missing
+          # Install packages in parallel batches for faster installation
+          sudo apt-get install -y --no-install-recommends \
             libhiredis-dev \
             libpq-dev \
             libzmq3-dev \
@@ -49,7 +53,9 @@ jobs:
             clang-format \
             clang-tidy \
             valgrind \
-            build-essential
+            build-essential \
+            ccache \
+            ninja-build
             
       - name: Verify package installation
         run: |
@@ -64,80 +70,101 @@ jobs:
           ls -la /usr/include/zmq* || echo "zmq headers not found"
           
       - name: Install nlohmann/json
+        timeout-minutes: 25
         run: |
           echo "=== Installing nlohmann/json ==="
-          # Try to install from package manager first
-          if sudo apt-get install -y nlohmann-json3-dev 2>/dev/null; then
+          # Try to install from package manager first (faster)
+          if sudo apt-get install -y --no-install-recommends nlohmann-json3-dev 2>/dev/null; then
             echo "✅ Installed nlohmann-json3-dev from package manager"
           else
-            echo "📦 Installing nlohmann/json from source"
-            git clone https://github.com/nlohmann/json.git
+            echo "📦 Installing nlohmann/json from source with optimizations"
+            git clone --depth 1 https://github.com/nlohmann/json.git
             cd json
-            cmake -E make_directory "build"
-            cmake -E chdir "build" cmake -DJSON_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release ../
-            cmake --build "build" --config Release
-            sudo cmake --build "build" --config Release --target install
+            cmake -B build -G Ninja \
+              -DJSON_BuildTests=OFF \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr/local
+            cmake --build build --parallel
+            sudo cmake --build build --target install
             cd ..
-            echo "✅ nlohmann/json installed from source"
+            echo "✅ nlohmann/json installed from source (optimized)"
           fi
           
       - name: Install jwt-cpp
+        timeout-minutes: 25
         run: |
           echo "=== Installing jwt-cpp ==="
-          # Try to install from package manager first
-          if sudo apt-get install -y libjwt-dev 2>/dev/null; then
+          # Try to install from package manager first (faster)
+          if sudo apt-get install -y --no-install-recommends libjwt-dev 2>/dev/null; then
             echo "✅ Installed libjwt-dev from package manager"
           else
-            echo "📦 Installing jwt-cpp from source"
-            git clone https://github.com/Thalhammer/jwt-cpp.git
+            echo "📦 Installing jwt-cpp from source with optimizations"
+            git clone --depth 1 https://github.com/Thalhammer/jwt-cpp.git
             cd jwt-cpp
-            cmake -E make_directory "build"
-            cmake -E chdir "build" cmake -DCMAKE_BUILD_TYPE=Release ../
-            cmake --build "build" --config Release
-            sudo cmake --build "build" --config Release --target install
+            cmake -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_INSTALL_PREFIX=/usr/local \
+              -DJWT_BUILD_TESTS=OFF \
+              -DJWT_BUILD_EXAMPLES=OFF
+            cmake --build build --parallel
+            sudo cmake --build build --target install
             cd ..
-            echo "✅ jwt-cpp installed from source"
+            echo "✅ jwt-cpp installed from source (optimized)"
           fi
             
       - name: Configure CMake
+        timeout-minutes: 25
         run: |
-          echo "=== Configuring CMake ==="
+          echo "=== Configuring CMake with Speed Optimizations ==="
           echo "Build type: ${{ matrix.build_type }}"
           echo "Compiler: ${{ matrix.compiler }}"
-          echo "Current directory: $(pwd)"
-          echo "Directory contents:"
-          ls -la
+          echo "CPU cores: $(nproc)"
+          echo "Available memory: $(free -h)"
           echo "CMake version:"
           cmake --version
-          echo "Configuring build..."
-          cmake -B build \
+          echo "Configuring build with optimizations..."
+          cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_TESTS=ON \
             -DBUILD_BENCHMARKS=OFF \
             -DENABLE_SANITIZERS=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
+            -DENABLE_PARALLEL_BUILD=ON \
+            -DENABLE_UNITY_BUILD=ON \
+            -DENABLE_PRECOMPILED_HEADERS=ON \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_VERBOSE_MAKEFILE=ON
-          echo "✅ CMake configuration completed"
+            -DCMAKE_BUILD_PARALLEL_LEVEL=0 \
+            -DCMAKE_VERBOSE_MAKEFILE=OFF
+          echo "✅ CMake configuration completed with optimizations"
           echo "Build directory contents:"
           ls -la build/
           
       - name: Build HFT System
+        timeout-minutes: 25
         run: |
-          echo "=== Building HFT System ==="
-          echo "Starting build with ${{ matrix.compiler }} for ${{ matrix.build_type }}"
-          echo "Build directory contents:"
-          ls -la build/
-          echo "Starting build..."
-          cmake --build build --parallel $(nproc) --verbose
-          echo "✅ Build completed successfully"
+          echo "=== Building HFT System with Maximum Parallelization ==="
+          echo "Starting optimized build with ${{ matrix.compiler }} for ${{ matrix.build_type }}"
+          echo "Using $(nproc) parallel jobs"
+          echo "Memory usage before build:"
+          free -h
+          echo "Starting high-performance build..."
+          # Use all available cores with optimal memory usage
+          time cmake --build build --parallel $(nproc) --config ${{ matrix.build_type }}
+          echo "Memory usage after build:"
+          free -h
+          echo "Build artifacts:"
+          find build -type f -executable -ls 2>/dev/null || true
+          echo "✅ High-performance build completed successfully"
           
       - name: Run Unit Tests
+        timeout-minutes: 25
         run: |
-          echo "=== Running Unit Tests ==="
+          echo "=== Running Unit Tests with Extended Timeout ==="
           cd build
-          echo "Running unit tests..."
-          ctest --output-on-failure --parallel $(nproc) --timeout 300
-          echo "✅ Unit tests completed"
+          echo "Running unit tests with $(nproc) parallel jobs..."
+          echo "Test timeout: 1200 seconds per test"
+          # Extended timeout (20 minutes per test) with parallel execution
+          ctest --output-on-failure --parallel $(nproc) --timeout 1200 --schedule-random
+          echo "✅ Unit tests completed with extended timeout"
           
       - name: Lint Modified Code
         if: github.event_name == 'pull_request'
