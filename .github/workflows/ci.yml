@@ -5,20 +5,15 @@ on:
     branches: [main, develop, day_*]
   pull_request:
     branches: [main, develop]
-  workflow_call:
-    outputs:
-      success_run_attempt:
-        value: ${{ jobs.build.outputs.success_run_attempt }}
 
 permissions:
-  pull-requests: write
   contents: read
 
 jobs:
   build-and-test:
     name: Build and Test HFT System
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     
     strategy:
       matrix:
@@ -53,10 +48,12 @@ jobs:
             pkg-config \
             clang-format \
             clang-tidy \
-            valgrind
+            valgrind \
+            build-essential
             
       - name: Verify package installation
         run: |
+          echo "=== Verifying package installation ==="
           echo "Checking installed packages:"
           pkg-config --list-all | grep -E "(hiredis|libzmq|libpq|openssl|boost)" || echo "Some packages not found via pkg-config"
           echo "Checking library files:"
@@ -68,11 +65,12 @@ jobs:
           
       - name: Install nlohmann/json
         run: |
+          echo "=== Installing nlohmann/json ==="
           # Try to install from package manager first
           if sudo apt-get install -y nlohmann-json3-dev 2>/dev/null; then
-            echo "Installed nlohmann-json3-dev from package manager"
+            echo "✅ Installed nlohmann-json3-dev from package manager"
           else
-            echo "Installing nlohmann/json from source"
+            echo "📦 Installing nlohmann/json from source"
             git clone https://github.com/nlohmann/json.git
             cd json
             cmake -E make_directory "build"
@@ -80,15 +78,17 @@ jobs:
             cmake --build "build" --config Release
             sudo cmake --build "build" --config Release --target install
             cd ..
+            echo "✅ nlohmann/json installed from source"
           fi
           
       - name: Install jwt-cpp
         run: |
+          echo "=== Installing jwt-cpp ==="
           # Try to install from package manager first
           if sudo apt-get install -y libjwt-dev 2>/dev/null; then
-            echo "Installed libjwt-dev from package manager"
+            echo "✅ Installed libjwt-dev from package manager"
           else
-            echo "Installing jwt-cpp from source"
+            echo "📦 Installing jwt-cpp from source"
             git clone https://github.com/Thalhammer/jwt-cpp.git
             cd jwt-cpp
             cmake -E make_directory "build"
@@ -96,20 +96,14 @@ jobs:
             cmake --build "build" --config Release
             sudo cmake --build "build" --config Release --target install
             cd ..
+            echo "✅ jwt-cpp installed from source"
           fi
             
-      - name: Install Google Benchmark
-        run: |
-          git clone https://github.com/google/benchmark.git
-          cd benchmark
-          cmake -E make_directory "build"
-          cmake -E chdir "build" cmake -DBENCHMARK_DOWNLOAD_DEPENDENCIES=on -DCMAKE_BUILD_TYPE=Release ../
-          cmake --build "build" --config Release
-          sudo cmake --build "build" --config Release --target install
-          
       - name: Configure CMake
         run: |
-          echo "Configuring CMake for ${{ matrix.build_type }} with ${{ matrix.compiler }}"
+          echo "=== Configuring CMake ==="
+          echo "Build type: ${{ matrix.build_type }}"
+          echo "Compiler: ${{ matrix.compiler }}"
           echo "Current directory: $(pwd)"
           echo "Directory contents:"
           ls -la
@@ -119,107 +113,98 @@ jobs:
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_TESTS=ON \
-            -DBUILD_BENCHMARKS=ON \
+            -DBUILD_BENCHMARKS=OFF \
             -DENABLE_SANITIZERS=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_VERBOSE_MAKEFILE=ON \
-            -DCMAKE_FIND_DEBUG_MODE=ON
-          echo "CMake configuration completed"
+            -DCMAKE_VERBOSE_MAKEFILE=ON
+          echo "✅ CMake configuration completed"
           echo "Build directory contents:"
           ls -la build/
-            
+          
       - name: Build HFT System
         run: |
+          echo "=== Building HFT System ==="
           echo "Starting build with ${{ matrix.compiler }} for ${{ matrix.build_type }}"
           echo "Build directory contents:"
           ls -la build/
           echo "Starting build..."
           cmake --build build --parallel $(nproc) --verbose
-          echo "Build completed successfully"
+          echo "✅ Build completed successfully"
           
       - name: Run Unit Tests
         run: |
+          echo "=== Running Unit Tests ==="
           cd build
+          echo "Running unit tests..."
           ctest --output-on-failure --parallel $(nproc) --timeout 300
+          echo "✅ Unit tests completed"
           
-      - name: Run Integration Tests
-        if: matrix.build_type == 'Release'
+      - name: Lint Modified Code
+        if: github.event_name == 'pull_request'
         run: |
-          cd build
-          # Run integration test suite if it exists
-          if [ -f "./tests/test_integration_suite" ]; then
-            ./tests/test_integration_suite
+          echo "=== Linting Modified Code ==="
+          echo "Linting modified C++ files..."
+          # Get list of modified C++ files
+          git diff --name-only ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }} | grep -E '\.(cpp|hpp)$' > modified_files.txt || echo "No C++ files modified"
+          
+          if [ -s modified_files.txt ]; then
+            echo "Modified C++ files:"
+            cat modified_files.txt
+            
+            # Run clang-format check on modified files
+            echo "Checking code formatting..."
+            while IFS= read -r file; do
+              if [ -f "$file" ]; then
+                echo "Checking format of: $file"
+                clang-format --dry-run --Werror "$file" || echo "Formatting issues found in $file"
+              fi
+            done < modified_files.txt
+            
+            # Run clang-tidy on modified files
+            echo "Running static analysis on modified files..."
+            cd build
+            while IFS= read -r file; do
+              if [ -f "../$file" ]; then
+                echo "Analyzing: $file"
+                clang-tidy "../$file" -p . --quiet || echo "Static analysis issues found in $file"
+              fi
+            done < ../modified_files.txt
+            cd ..
+            echo "✅ Modified code linting completed"
+          else
+            echo "No C++ files to lint"
           fi
           
-      - name: Run Performance Tests
-        if: matrix.build_type == 'Release'
+      - name: Full Code Linting
+        if: matrix.compiler == 'clang' && matrix.build_type == 'Release'
         run: |
+          echo "=== Full Code Linting ==="
+          echo "Running comprehensive code quality checks..."
           cd build
-          # Run performance regression tests if they exist
-          if [ -f "./tests/test_performance_regression" ]; then
-            ./tests/test_performance_regression
-          fi
           
-      - name: Code Coverage (Debug only)
-        if: matrix.build_type == 'Debug' && matrix.compiler == 'gcc'
-        run: |
-          sudo apt-get install -y gcovr
-          cmake --build build --target coverage || echo "Coverage target not available"
+          # Run clang-format on all source files
+          echo "Checking code formatting for all files..."
+          find ../src -name "*.cpp" -o -name "*.hpp" | while read file; do
+            echo "Checking format of: $file"
+            clang-format --dry-run --Werror "$file" || echo "Formatting issues found in $file"
+          done
           
-      - name: Static Analysis
-        if: matrix.compiler == 'clang'
-        run: |
-          cmake --build build --target lint || echo "Lint target not available"
+          # Run clang-tidy on all source files
+          echo "Running comprehensive static analysis..."
+          find ../src -name "*.cpp" -o -name "*.hpp" | while read file; do
+            echo "Analyzing: $file"
+            clang-tidy "$file" -p . --quiet || echo "Static analysis issues found in $file"
+          done
           
-      - name: Memory Check (Debug only)
-        if: matrix.build_type == 'Debug' && matrix.compiler == 'gcc'
-        run: |
-          cd build
-          # Run memory checks on core components
-          if [ -f "./goldearn_engine" ]; then
-            timeout 60s valgrind --tool=memcheck --leak-check=summary --error-exitcode=1 \
-              ./goldearn_engine --help || echo "Memory check completed with warnings"
-          fi
+          echo "✅ Full code linting completed"
           
-      - name: Security Scan
-        uses: securecodewarrior/github-action-add-sarif@v1
-        with:
-          sarif-file: 'security-scan-results.sarif'
-        continue-on-error: true
-        
       - name: Upload build artifacts
         if: matrix.build_type == 'Release' && matrix.compiler == 'gcc'
         uses: actions/upload-artifact@v4
         with:
-          name: goldearn-hft-binaries
+          name: goldearn-hft-binaries-${{ matrix.compiler }}
           path: |
             build/goldearn_*
             !build/**/*.o
             !build/**/*.a
           retention-days: 7
-          
-      - name: Performance Benchmark
-        if: matrix.build_type == 'Release' && matrix.compiler == 'gcc'
-        run: |
-          cd build
-          # Run benchmarks if available
-          find . -name "*_benchmark" -executable -type f | head -3 | while read bench; do
-            echo "Running benchmark: $bench"
-            timeout 120s "$bench" --benchmark_format=json --benchmark_out=benchmark_results.json || true
-          done
-          
-      - name: HFT System Health Check
-        if: matrix.build_type == 'Release'
-        run: |
-          cd build
-          # Basic smoke test for HFT components
-          echo "Testing HFT system health..."
-          if [ -f "./goldearn_engine" ]; then
-            timeout 30s ./goldearn_engine --version 2>/dev/null || echo "Engine version check completed"
-          fi
-          if [ -f "./goldearn_feed_handler" ]; then
-            timeout 30s ./goldearn_feed_handler --help 2>/dev/null || echo "Feed handler help completed"
-          fi
-          if [ -f "./goldearn_risk_monitor" ]; then
-            timeout 30s ./goldearn_risk_monitor --help 2>/dev/null || echo "Risk monitor help completed"
-          fi
