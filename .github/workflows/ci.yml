@@ -48,13 +48,44 @@ jobs:
             libzmq3-dev \
             libboost-all-dev \
             libssl-dev \
-            nlohmann-json3-dev \
             libgtest-dev \
             libgmock-dev \
             pkg-config \
             clang-format \
             clang-tidy \
             valgrind
+          
+      - name: Install nlohmann/json
+        run: |
+          # Try to install from package manager first
+          if sudo apt-get install -y nlohmann-json3-dev 2>/dev/null; then
+            echo "Installed nlohmann-json3-dev from package manager"
+          else
+            echo "Installing nlohmann/json from source"
+            git clone https://github.com/nlohmann/json.git
+            cd json
+            cmake -E make_directory "build"
+            cmake -E chdir "build" cmake -DJSON_BuildTests=OFF -DCMAKE_BUILD_TYPE=Release ../
+            cmake --build "build" --config Release
+            sudo cmake --build "build" --config Release --target install
+            cd ..
+          fi
+          
+      - name: Install jwt-cpp
+        run: |
+          # Try to install from package manager first
+          if sudo apt-get install -y libjwt-dev 2>/dev/null; then
+            echo "Installed libjwt-dev from package manager"
+          else
+            echo "Installing jwt-cpp from source"
+            git clone https://github.com/Thalhammer/jwt-cpp.git
+            cd jwt-cpp
+            cmake -E make_directory "build"
+            cmake -E chdir "build" cmake -DCMAKE_BUILD_TYPE=Release ../
+            cmake --build "build" --config Release
+            sudo cmake --build "build" --config Release --target install
+            cd ..
+          fi
             
       - name: Install Google Benchmark
         run: |
@@ -67,16 +98,30 @@ jobs:
           
       - name: Configure CMake
         run: |
+          echo "Configuring CMake for ${{ matrix.build_type }} with ${{ matrix.compiler }}"
+          echo "Current directory: $(pwd)"
+          echo "Directory contents:"
+          ls -la
+          echo "CMake version:"
+          cmake --version
+          echo "Configuring build..."
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_TESTS=ON \
             -DBUILD_BENCHMARKS=ON \
             -DENABLE_SANITIZERS=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_VERBOSE_MAKEFILE=ON
+          echo "CMake configuration completed"
             
       - name: Build HFT System
         run: |
-          cmake --build build --parallel $(nproc)
+          echo "Starting build with ${{ matrix.compiler }} for ${{ matrix.build_type }}"
+          echo "Build directory contents:"
+          ls -la build/
+          echo "Starting build..."
+          cmake --build build --parallel $(nproc) --verbose
+          echo "Build completed successfully"
           
       - name: Run Unit Tests
         run: |
