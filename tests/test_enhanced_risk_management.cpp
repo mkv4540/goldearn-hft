@@ -100,7 +100,7 @@ TEST_F(EnhancedRiskManagementTest, PositionTracking) {
     fill.price = 2500.0;
     fill.side = OrderSide::BUY;
     fill.strategy_id = "market_making";
-    fill.fill_time = std::chrono::duration_cast<market_data::Timestamp>(
+    fill.fill_time = std::chrono::duration_cast<goldearn::market_data::Timestamp>(
         std::chrono::high_resolution_clock::now().time_since_epoch()
     );
     
@@ -136,7 +136,7 @@ TEST_F(EnhancedRiskManagementTest, MultiplePositionsAndStrategies) {
     };
     
     for (auto& fill : fills) {
-        fill.fill_time = std::chrono::duration_cast<market_data::Timestamp>(
+        fill.fill_time = std::chrono::duration_cast<goldearn::market_data::Timestamp>(
             std::chrono::high_resolution_clock::now().time_since_epoch()
         );
         position_tracker_->update_position(fill);
@@ -177,7 +177,7 @@ TEST_F(EnhancedRiskManagementTest, RiskLimitViolations) {
     large_fill.price = 2500.0; // 2.5M position
     large_fill.side = OrderSide::BUY;
     large_fill.strategy_id = "market_making";
-    large_fill.fill_time = std::chrono::duration_cast<market_data::Timestamp>(
+    large_fill.fill_time = std::chrono::duration_cast<goldearn::market_data::Timestamp>(
         std::chrono::high_resolution_clock::now().time_since_epoch()
     );
     
@@ -209,7 +209,7 @@ TEST_F(EnhancedRiskManagementTest, VarCalculationAccuracy) {
     };
     
     for (auto& fill : fills) {
-        fill.fill_time = std::chrono::duration_cast<market_data::Timestamp>(
+        fill.fill_time = std::chrono::duration_cast<goldearn::market_data::Timestamp>(
             std::chrono::high_resolution_clock::now().time_since_epoch()
         );
         position_tracker_->update_position(fill);
@@ -249,7 +249,6 @@ TEST_F(EnhancedRiskManagementTest, CircuitBreakerFunctionality) {
     // Orders should be rejected when circuit breaker is active
     Order test_order;
     test_order.symbol_id = 1001;
-    test_order.symbol = "RELIANCE";
     test_order.quantity = 100;
     test_order.price = 2500.0;
     test_order.side = OrderSide::BUY;
@@ -274,7 +273,6 @@ TEST_F(EnhancedRiskManagementTest, BlacklistFunctionality) {
     // Orders for blacklisted symbol should be rejected
     Order blacklisted_order;
     blacklisted_order.symbol_id = 1001;
-    blacklisted_order.symbol = "RELIANCE";
     blacklisted_order.quantity = 100;
     blacklisted_order.price = 2500.0;
     blacklisted_order.side = OrderSide::BUY;
@@ -295,7 +293,6 @@ TEST_F(EnhancedRiskManagementTest, PerformanceMetrics) {
     // Run multiple risk checks to gather statistics
     Order test_order;
     test_order.symbol_id = 1001;
-    test_order.symbol = "RELIANCE";
     test_order.quantity = 100;
     test_order.price = 2500.0;
     test_order.side = OrderSide::BUY;

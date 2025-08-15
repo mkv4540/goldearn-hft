@@ -27,6 +27,8 @@ struct Fill {
     Fill(const trading::ExecutionReport& exec, const std::string& symbol_name, const std::string& strat_id)
         : symbol_id(exec.symbol_id), symbol(symbol_name), quantity(exec.executed_quantity), 
           price(exec.executed_price), side(exec.side), strategy_id(strat_id), fill_time(exec.execution_time) {}
+    Fill(uint64_t sym_id, const std::string& sym, double qty, double prc, trading::OrderSide s, const std::string& strat_id)
+        : symbol_id(sym_id), symbol(sym), quantity(qty), price(prc), side(s), strategy_id(strat_id), fill_time() {}
 };
 
 struct PositionInfo {
