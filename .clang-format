@@ -24,7 +24,6 @@ FixNamespaceComments: true
 IncludeBlocks: Regroup
 IndentCaseLabels: true
 IndentPPDirectives: None
-IndentWidth: 4
 IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 Language: Cpp
