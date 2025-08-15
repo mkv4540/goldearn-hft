@@ -129,6 +129,7 @@ set(UTILS_SOURCES
 set(TRADING_SOURCES)
 set(RISK_SOURCES
     src/risk/risk_engine.cpp
+    src/risk/advanced_position_tracker.cpp
 )
 set(STRATEGIES_SOURCES)
 set(NETWORK_SOURCES

@@ -40,6 +40,17 @@ target_link_libraries(test_risk
     GTest::gtest_main
 )
 
+# Enhanced risk management tests
+add_executable(test_enhanced_risk_management
+    test_enhanced_risk_management.cpp
+)
+
+target_link_libraries(test_enhanced_risk_management
+    goldearn_core
+    GTest::gtest
+    GTest::gtest_main
+)
+
 # Core utilities tests
 add_executable(test_core
     test_latency_tracker.cpp
@@ -130,6 +141,7 @@ endif()
 add_test(NAME MarketDataTests COMMAND test_market_data)
 add_test(NAME TradingTests COMMAND test_trading)
 add_test(NAME RiskTests COMMAND test_risk)
+add_test(NAME EnhancedRiskTests COMMAND test_enhanced_risk_management)
 add_test(NAME CoreTests COMMAND test_core)
 add_test(NAME ConfigTests COMMAND test_config)
 add_test(NAME AuthTests COMMAND test_auth)
@@ -139,7 +151,7 @@ add_test(NAME IntegrationTests COMMAND test_integration)
 add_test(NAME PerformanceTests COMMAND test_performance)
 
 # Test properties
-set_tests_properties(MarketDataTests TradingTests RiskTests CoreTests ConfigTests AuthTests MonitoringTests SecurityTests
+set_tests_properties(MarketDataTests TradingTests RiskTests EnhancedRiskTests CoreTests ConfigTests AuthTests MonitoringTests SecurityTests
     PROPERTIES
     TIMEOUT 30
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

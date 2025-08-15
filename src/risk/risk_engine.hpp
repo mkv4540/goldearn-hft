@@ -15,6 +15,16 @@
 #include <mutex>
 #include <shared_mutex>
 
+// Custom hash function for std::pair
+struct PairHash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+        return h1 ^ (h2 << 1);
+    }
+};
+
 namespace goldearn::risk {
 
 // Risk check result
@@ -278,6 +288,10 @@ private:
     void check_strategy_risk_limits();
     void check_correlation_limits();
     
+    // Enhanced risk calculation helpers
+    double get_strategy_exposure(const std::string& strategy_id) const;
+    double get_strategy_volatility(const std::string& strategy_id) const;
+    
     // Performance measurement
     void record_check_latency(uint64_t latency_ns);
     void update_statistics(RiskCheckResult result);
@@ -316,7 +330,7 @@ public:
     // VaR calculation methods
     double calculate_parametric_var(const std::unordered_map<uint64_t, double>& positions,
                                    const std::unordered_map<uint64_t, double>& volatilities,
-                                   const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+                                   const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
                                    double confidence_level = 0.05,
                                    uint32_t time_horizon_days = 1) const;
     
@@ -328,7 +342,7 @@ public:
     double calculate_monte_carlo_var(const std::unordered_map<uint64_t, double>& positions,
                                     const std::unordered_map<uint64_t, double>& expected_returns,
                                     const std::unordered_map<uint64_t, double>& volatilities,
-                                    const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+                                    const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
                                     double confidence_level = 0.05,
                                     uint32_t time_horizon_days = 1,
                                     uint32_t num_simulations = 10000) const;
@@ -337,21 +351,21 @@ public:
     std::unordered_map<uint64_t, double> calculate_component_var(
         const std::unordered_map<uint64_t, double>& positions,
         const std::unordered_map<uint64_t, double>& volatilities,
-        const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+        const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
         double confidence_level = 0.05) const;
     
     // Marginal VaR (change in VaR from small position change)
     double calculate_marginal_var(uint64_t symbol_id,
                                  const std::unordered_map<uint64_t, double>& positions,
                                  const std::unordered_map<uint64_t, double>& volatilities,
-                                 const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+                                 const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
                                  double confidence_level = 0.05) const;
     
     // Incremental VaR (VaR change from adding new position)
     double calculate_incremental_var(uint64_t symbol_id, double new_position,
                                     const std::unordered_map<uint64_t, double>& existing_positions,
                                     const std::unordered_map<uint64_t, double>& volatilities,
-                                    const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+                                    const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
                                     double confidence_level = 0.05) const;
     
     // Risk decomposition
@@ -365,7 +379,7 @@ public:
     std::unordered_map<uint64_t, RiskDecomposition> decompose_portfolio_risk(
         const std::unordered_map<uint64_t, double>& positions,
         const std::unordered_map<uint64_t, double>& volatilities,
-        const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations) const;
+        const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations) const;
     
 private:
     // Helper methods
@@ -376,13 +390,13 @@ private:
     double calculate_portfolio_volatility(
         const std::unordered_map<uint64_t, double>& weights,
         const std::unordered_map<uint64_t, double>& volatilities,
-        const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations) const;
+        const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations) const;
     
     std::vector<double> simulate_portfolio_returns(
         const std::unordered_map<uint64_t, double>& positions,
         const std::unordered_map<uint64_t, double>& expected_returns,
         const std::unordered_map<uint64_t, double>& volatilities,
-        const std::unordered_map<std::pair<uint64_t, uint64_t>, double>& correlations,
+        const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations,
         uint32_t num_simulations) const;
     
     double quantile(std::vector<double> values, double percentile) const;
