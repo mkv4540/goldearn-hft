@@ -54,6 +54,17 @@ jobs:
             clang-format \
             clang-tidy \
             valgrind
+            
+      - name: Verify package installation
+        run: |
+          echo "Checking installed packages:"
+          pkg-config --list-all | grep -E "(hiredis|libzmq|libpq|openssl|boost)" || echo "Some packages not found via pkg-config"
+          echo "Checking library files:"
+          ls -la /usr/lib/x86_64-linux-gnu/libhiredis* || echo "hiredis libraries not found"
+          ls -la /usr/lib/x86_64-linux-gnu/libzmq* || echo "zmq libraries not found"
+          echo "Checking include files:"
+          ls -la /usr/include/hiredis* || echo "hiredis headers not found"
+          ls -la /usr/include/zmq* || echo "zmq headers not found"
           
       - name: Install nlohmann/json
         run: |
