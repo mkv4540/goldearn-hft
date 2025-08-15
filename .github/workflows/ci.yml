@@ -122,8 +122,11 @@ jobs:
             -DBUILD_BENCHMARKS=ON \
             -DENABLE_SANITIZERS=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }} \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -DCMAKE_VERBOSE_MAKEFILE=ON
+            -DCMAKE_VERBOSE_MAKEFILE=ON \
+            -DCMAKE_FIND_DEBUG_MODE=ON
           echo "CMake configuration completed"
+          echo "Build directory contents:"
+          ls -la build/
             
       - name: Build HFT System
         run: |
