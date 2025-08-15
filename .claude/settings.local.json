@@ -26,7 +26,18 @@
       "Bash(../run_tests.sh)",
       "Bash(/Users/manishkumar/Desktop/gitlocal/api_python3/learn_genius_quiz/goldearn-hft/setup_test_configs.sh)",
       "Bash(git checkout:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(./test_risk)",
+      "Bash(timeout:*)",
+      "Bash(./run_tests.sh)",
+      "Bash(make test:*)",
+      "Bash(make:*)",
+      "Bash(./build.sh)",
+      "Bash(./tests/test_enhanced_risk_management:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(mkdir:*)",
+      "Bash(git config:*)"
     ],
     "deny": []
   }
