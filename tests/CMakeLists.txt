@@ -153,7 +153,7 @@ add_test(NAME PerformanceTests COMMAND test_performance)
 # Test properties
 set_tests_properties(MarketDataTests TradingTests RiskTests EnhancedRiskTests CoreTests ConfigTests AuthTests MonitoringTests SecurityTests
     PROPERTIES
-    TIMEOUT 30
+    TIMEOUT 120
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 

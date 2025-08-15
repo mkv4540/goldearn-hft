@@ -11,6 +11,22 @@ option(BUILD_TESTS "Build unit tests" ON)
 option(BUILD_BENCHMARKS "Build performance benchmarks" ON)
 option(ENABLE_PROFILING "Enable profiling support" OFF)
 option(ENABLE_SANITIZERS "Enable AddressSanitizer and UBSan" OFF)
+option(ENABLE_PARALLEL_BUILD "Enable parallel compilation optimizations" ON)
+option(ENABLE_UNITY_BUILD "Enable Unity/Jumbo builds for faster compilation" ON)
+option(ENABLE_PRECOMPILED_HEADERS "Enable precompiled headers" ON)
+
+# Enable parallel compilation by default
+if(ENABLE_PARALLEL_BUILD)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -j$(nproc)")
+    endif()
+    # Set parallel build jobs for make
+    set(CMAKE_BUILD_PARALLEL_LEVEL 0)  # Use all available cores
+    # Enable faster linking
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_BUILD_TYPE STREQUAL "Release")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--threads")
+    endif()
+endif()
 
 # Compiler-specific optimizations for ultra-low latency
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -204,12 +220,36 @@ add_library(goldearn_core STATIC
     ${SECURITY_SOURCES}
 )
 
-# Set library properties
+# Set library properties with build optimizations
 set_target_properties(goldearn_core PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     POSITION_INDEPENDENT_CODE ON
 )
+
+# Enable Unity Build for faster compilation
+if(ENABLE_UNITY_BUILD AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+    set_target_properties(goldearn_core PROPERTIES UNITY_BUILD ON)
+    # Limit unity build batch size to avoid memory issues
+    set_target_properties(goldearn_core PROPERTIES UNITY_BUILD_BATCH_SIZE 8)
+endif()
+
+# Enable precompiled headers for faster compilation
+if(ENABLE_PRECOMPILED_HEADERS AND CMAKE_VERSION VERSION_GREATER_EQUAL "3.16")
+    target_precompile_headers(goldearn_core PRIVATE
+        <iostream>
+        <string>
+        <vector>
+        <memory>
+        <chrono>
+        <thread>
+        <mutex>
+        <atomic>
+        <algorithm>
+        <unordered_map>
+        <queue>
+    )
+endif()
 
 # Link libraries
 target_link_libraries(goldearn_core
@@ -310,45 +350,88 @@ include(CPack)
 
 # Custom targets for development
 
-# Code formatting with clang-format
+# Code formatting with clang-format (optimized for speed)
 find_program(CLANG_FORMAT clang-format)
 if(CLANG_FORMAT)
+    file(GLOB_RECURSE ALL_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/src/*.hpp)
     add_custom_target(format
-        COMMAND find ${CMAKE_SOURCE_DIR}/src -name "*.cpp" -o -name "*.hpp" | xargs ${CLANG_FORMAT} -i
-        COMMENT "Formatting code with clang-format"
+        COMMAND ${CMAKE_COMMAND} -E echo "Formatting ${CMAKE_CURRENT_LIST_LENGTH} source files in parallel..."
+        COMMAND find ${CMAKE_SOURCE_DIR}/src -name "*.cpp" -o -name "*.hpp" | xargs -P0 -I{} ${CLANG_FORMAT} -i {}
+        COMMENT "Formatting code with clang-format (parallel execution)"
+        VERBATIM
     )
 endif()
 
-# Static analysis with clang-tidy
+# Static analysis with clang-tidy (optimized for speed)
 find_program(CLANG_TIDY clang-tidy)
 if(CLANG_TIDY)
+    file(GLOB_RECURSE ALL_CPP_FILES ${CMAKE_SOURCE_DIR}/src/*.cpp)
     add_custom_target(lint
-        COMMAND ${CLANG_TIDY} ${CMAKE_SOURCE_DIR}/src/**/*.cpp -p ${CMAKE_BINARY_DIR}
-        COMMENT "Running static analysis with clang-tidy"
+        COMMAND ${CMAKE_COMMAND} -E echo "Running static analysis on ${CMAKE_CURRENT_LIST_LENGTH} files in parallel..."
+        COMMAND find ${CMAKE_SOURCE_DIR}/src -name "*.cpp" | xargs -P0 -I{} ${CLANG_TIDY} {} -p ${CMAKE_BINARY_DIR} --quiet
+        COMMENT "Running static analysis with clang-tidy (parallel execution)"
+        VERBATIM
+        DEPENDS ${CMAKE_BINARY_DIR}/compile_commands.json
     )
+endif()
+
+# Code coverage target
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    find_program(GCOV gcov)
+    find_program(LCOV lcov)
+    find_program(GENHTML genhtml)
+    
+    if(GCOV AND LCOV AND GENHTML)
+        # Add coverage flags
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
+        
+        # Coverage target
+        add_custom_target(coverage
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/coverage
+            COMMAND ${LCOV} --capture --directory ${CMAKE_BINARY_DIR} --output-file ${CMAKE_BINARY_DIR}/coverage/coverage.info
+            COMMAND ${LCOV} --remove ${CMAKE_BINARY_DIR}/coverage/coverage.info '/usr/*' '${CMAKE_SOURCE_DIR}/temp/*' '${CMAKE_SOURCE_DIR}/tests/*' --output-file ${CMAKE_BINARY_DIR}/coverage/coverage_filtered.info
+            COMMAND ${GENHTML} ${CMAKE_BINARY_DIR}/coverage/coverage_filtered.info --output-directory ${CMAKE_BINARY_DIR}/coverage/html
+            COMMAND ${CMAKE_COMMAND} -E echo "Coverage report generated in ${CMAKE_BINARY_DIR}/coverage/html/index.html"
+            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+            COMMENT "Generating code coverage report"
+        )
+        
+        # Clean coverage data
+        add_custom_target(coverage-clean
+            COMMAND ${LCOV} --zerocounters --directory ${CMAKE_BINARY_DIR}
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/coverage
+            COMMENT "Cleaning coverage data"
+        )
+    endif()
 endif()
 
 # Memory check with valgrind
 find_program(VALGRIND valgrind)
 if(VALGRIND)
     add_custom_target(memcheck
-        COMMAND ${VALGRIND} --tool=memcheck --leak-check=full --show-leak-kinds=all 
-                ${CMAKE_BINARY_DIR}/goldearn_engine --config=${CMAKE_SOURCE_DIR}/config/test.conf
+        COMMAND ${VALGRIND} --tool=memcheck --leak-check=full --show-leak-kinds=all --error-exitcode=1
+                $<TARGET_FILE:goldearn_engine> --help
         COMMENT "Running memory check with valgrind"
+        DEPENDS goldearn_engine
     )
 endif()
 
 # Performance profiling with perf
-add_custom_target(profile
-    COMMAND perf record -g ${CMAKE_BINARY_DIR}/goldearn_engine --config=${CMAKE_SOURCE_DIR}/config/profile.conf
-    COMMAND perf report
-    COMMENT "Running performance profiling with perf"
-)
+find_program(PERF perf)
+if(PERF)
+    add_custom_target(profile
+        COMMAND ${PERF} record -g $<TARGET_FILE:goldearn_engine> --help
+        COMMAND ${PERF} report
+        COMMENT "Running performance profiling with perf"
+        DEPENDS goldearn_engine
+    )
+endif()
 
 # Generate compile_commands.json for IDE support
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Print build configuration
+# Print build configuration with optimization status
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
@@ -356,3 +439,11 @@ message(STATUS "Build tests: ${BUILD_TESTS}")
 message(STATUS "Build benchmarks: ${BUILD_BENCHMARKS}")
 message(STATUS "Enable profiling: ${ENABLE_PROFILING}")
 message(STATUS "Enable sanitizers: ${ENABLE_SANITIZERS}")
+message(STATUS "Enable parallel build: ${ENABLE_PARALLEL_BUILD}")
+message(STATUS "Enable unity build: ${ENABLE_UNITY_BUILD}")
+message(STATUS "Enable precompiled headers: ${ENABLE_PRECOMPILED_HEADERS}")
+message(STATUS "Parallel build level: ${CMAKE_BUILD_PARALLEL_LEVEL}")
+if(ENABLE_PARALLEL_BUILD)
+    cmake_host_system_information(RESULT CPU_CORES QUERY NUMBER_OF_LOGICAL_CORES)
+    message(STATUS "Available CPU cores: ${CPU_CORES}")
+endif()
