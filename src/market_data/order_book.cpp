@@ -162,7 +162,8 @@ void OrderBook::full_refresh(const std::vector<PriceLevel>& bids,
 
     update_best_prices();
     last_update_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+                       std::chrono::high_resolution_clock::now().time_since_epoch())
+                       .count();
 }
 
 double OrderBook::get_vwap(size_t depth) const {
@@ -475,7 +476,8 @@ OrderBookAnalytics::Signal OrderBookAnalytics::generate_signal() const {
     signal.confidence = 0.0;
     signal.price_target = order_book_->get_mid_price();
     signal.timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+                           std::chrono::high_resolution_clock::now().time_since_epoch())
+                           .count();
 
     // Simple signal generation based on imbalance
     double imbalance = order_book_->get_imbalance();

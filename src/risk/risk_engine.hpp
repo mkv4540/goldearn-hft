@@ -102,7 +102,8 @@ struct RiskViolation {
           current_value(0.0),
           limit_value(0.0) {
         timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+                        std::chrono::high_resolution_clock::now().time_since_epoch())
+                        .count();
     }
 };
 

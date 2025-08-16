@@ -1,9 +1,9 @@
 #pragma once
 
+#include <array>
+#include <chrono>
 #include <cstdint>
 #include <string>
-#include <chrono>
-#include <array>
 
 namespace goldearn::market_data {
 
@@ -64,24 +64,24 @@ struct __attribute__((packed)) TradeMessage {
 struct __attribute__((packed)) QuoteMessage {
     MessageHeader header;
     uint64_t symbol_id;
-    
+
     // Best bid/ask
     double bid_price;
     uint64_t bid_quantity;
     double ask_price;
     uint64_t ask_quantity;
-    
+
     // Market depth (5 levels each side)
     struct Level {
         double price;
         uint64_t quantity;
         uint16_t num_orders;
     } __attribute__((packed));
-    
+
     // Use C-style arrays to ensure POD layout within packed struct
     Level bid_levels[5];
     Level ask_levels[5];
-    
+
     Timestamp quote_time;
 };
 
@@ -138,4 +138,4 @@ struct __attribute__((packed)) HeartbeatMessage {
     Timestamp heartbeat_time;
 };
 
-} // namespace goldearn::market_data
+}  // namespace goldearn::market_data

@@ -380,7 +380,8 @@ RiskEngine::RiskReport RiskEngine::generate_risk_report() const {
     report.correlation_risk = calculate_correlation_risk();
     report.circuit_breaker_status = circuit_breaker_active_.load();
     report.report_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+                             std::chrono::high_resolution_clock::now().time_since_epoch())
+                             .count();
 
     return report;
 }
@@ -459,16 +460,15 @@ void RiskEngine::cleanup_old_violations() {
     auto now = std::chrono::high_resolution_clock::now();
     auto cutoff_time = now - std::chrono::hours(24);
 
-    violations_.erase(
-        std::remove_if(violations_.begin(),
-                       violations_.end(),
-                       [cutoff_time](const RiskViolation& v) {
-                           auto violation_time =
-                               std::chrono::high_resolution_clock::time_point(
-                                   std::chrono::nanoseconds(v.timestamp));
-                           return violation_time < cutoff_time;
-                       }),
-        violations_.end());
+    violations_.erase(std::remove_if(violations_.begin(),
+                                     violations_.end(),
+                                     [cutoff_time](const RiskViolation& v) {
+                                         auto violation_time =
+                                             std::chrono::high_resolution_clock::time_point(
+                                                 std::chrono::nanoseconds(v.timestamp));
+                                         return violation_time < cutoff_time;
+                                     }),
+                      violations_.end());
 }
 
 void RiskEngine::risk_monitoring_worker() {
