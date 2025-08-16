@@ -73,7 +73,9 @@
       "Bash(git count-objects:*)",
       "Bash(/Users/manishkumar/Desktop/gitlocal/api_python3/learn_genius_quiz/goldearn-hft/scripts/git_timeout_optimizer.sh)",
       "Bash(git_health_check)",
-      "Bash(git quick-status:*)"
+      "Bash(git quick-status:*)",
+      "Bash(git quick-status:*)",
+      "Bash(export:*)"
     ],
     "deny": []
   }
