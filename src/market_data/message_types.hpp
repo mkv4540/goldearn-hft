@@ -7,8 +7,8 @@
 
 namespace goldearn::market_data {
 
-// High-precision timestamp using nanoseconds since epoch
-using Timestamp = std::chrono::nanoseconds;
+// High-precision timestamp using nanoseconds since epoch (POD-compatible)
+using Timestamp = uint64_t;  // Nanoseconds since epoch as raw integer
 
 // Market data message types for NSE/BSE protocols
 enum class MessageType : uint8_t {
@@ -76,10 +76,11 @@ struct __attribute__((packed)) QuoteMessage {
         double price;
         uint64_t quantity;
         uint16_t num_orders;
-    };
+    } __attribute__((packed));
     
-    std::array<Level, 5> bid_levels;
-    std::array<Level, 5> ask_levels;
+    // Use C-style arrays to ensure POD layout within packed struct
+    Level bid_levels[5];
+    Level ask_levels[5];
     
     Timestamp quote_time;
 };

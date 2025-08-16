@@ -101,8 +101,8 @@ struct RiskViolation {
           symbol_id(0),
           current_value(0.0),
           limit_value(0.0) {
-        timestamp = std::chrono::duration_cast<market_data::Timestamp>(
-            std::chrono::high_resolution_clock::now().time_since_epoch());
+        timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     }
 };
 

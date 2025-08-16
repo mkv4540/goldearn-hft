@@ -56,8 +56,8 @@ struct ManagedOrder : public Order {
         max_slippage_bps = 10.0;       // Default 10 bps max slippage
         max_execution_time_ms = 5000;  // Default 5 second timeout
         allow_partial_fills = true;
-        last_state_change = std::chrono::duration_cast<market_data::Timestamp>(
-            std::chrono::high_resolution_clock::now().time_since_epoch());
+        last_state_change = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     }
 };
 

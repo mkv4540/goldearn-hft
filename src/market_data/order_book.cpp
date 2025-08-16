@@ -117,7 +117,7 @@ void OrderBook::update_quote(const QuoteMessage& quote) {
     ask_quantity_.store(quote.ask_quantity);
 
     // Update depth levels
-    for (size_t i = 0; i < MAX_DEPTH && i < quote.bid_levels.size(); ++i) {
+    for (size_t i = 0; i < MAX_DEPTH; ++i) {
         if (quote.bid_levels[i].price > 0) {
             bid_levels_[i] = PriceLevel{quote.bid_levels[i].price,
                                         quote.bid_levels[i].quantity,
@@ -126,7 +126,7 @@ void OrderBook::update_quote(const QuoteMessage& quote) {
         }
     }
 
-    for (size_t i = 0; i < MAX_DEPTH && i < quote.ask_levels.size(); ++i) {
+    for (size_t i = 0; i < MAX_DEPTH; ++i) {
         if (quote.ask_levels[i].price > 0) {
             ask_levels_[i] = PriceLevel{quote.ask_levels[i].price,
                                         quote.ask_levels[i].quantity,
@@ -161,8 +161,8 @@ void OrderBook::full_refresh(const std::vector<PriceLevel>& bids,
     }
 
     update_best_prices();
-    last_update_ = std::chrono::duration_cast<Timestamp>(
-        std::chrono::high_resolution_clock::now().time_since_epoch());
+    last_update_ = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
 double OrderBook::get_vwap(size_t depth) const {
@@ -474,8 +474,8 @@ OrderBookAnalytics::Signal OrderBookAnalytics::generate_signal() const {
     signal.signal_type = Signal::NEUTRAL;
     signal.confidence = 0.0;
     signal.price_target = order_book_->get_mid_price();
-    signal.timestamp = std::chrono::duration_cast<Timestamp>(
-        std::chrono::high_resolution_clock::now().time_since_epoch());
+    signal.timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
     // Simple signal generation based on imbalance
     double imbalance = order_book_->get_imbalance();

@@ -47,8 +47,8 @@ void AdvancedPositionTracker::update_position(const Fill& fill) {
         position.avg_cost = fill.price;
         position.current_price = fill.price;
         position.strategy_id = fill.strategy_id;
-        position.last_update = std::chrono::duration_cast<market_data::Timestamp>(
-            std::chrono::high_resolution_clock::now().time_since_epoch());
+        position.last_update = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
         calculate_position_risk_metrics(position);
         positions_[fill.symbol_id] = position;
@@ -80,8 +80,8 @@ void AdvancedPositionTracker::update_position(const Fill& fill) {
         }
 
         position.current_price = fill.price;
-        position.last_update = std::chrono::duration_cast<market_data::Timestamp>(
-            std::chrono::high_resolution_clock::now().time_since_epoch());
+        position.last_update = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
         calculate_position_risk_metrics(position);
 
@@ -107,8 +107,8 @@ void AdvancedPositionTracker::update_market_data(uint64_t symbol_id, double pric
     if (it != positions_.end()) {
         it->second.current_price = price;
         it->second.unrealized_pnl = it->second.quantity * (price - it->second.avg_cost);
-        it->second.last_update = std::chrono::duration_cast<market_data::Timestamp>(
-            std::chrono::high_resolution_clock::now().time_since_epoch());
+        it->second.last_update = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
         calculate_position_risk_metrics(it->second);
     }
@@ -353,8 +353,8 @@ void AdvancedPositionTracker::update_portfolio_metrics() {
         portfolio_metrics_.total_long_exposure + portfolio_metrics_.total_short_exposure;
 
     portfolio_metrics_.portfolio_var_1d = calculate_portfolio_var(1, 0.95);
-    portfolio_metrics_.last_update = std::chrono::duration_cast<market_data::Timestamp>(
-        std::chrono::high_resolution_clock::now().time_since_epoch());
+    portfolio_metrics_.last_update = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
 void AdvancedPositionTracker::update_strategy_metrics(const std::string& strategy_id) {
@@ -378,8 +378,8 @@ void AdvancedPositionTracker::update_strategy_metrics(const std::string& strateg
     }
 
     metrics.strategy_var = calculate_strategy_var(strategy_id, 1);
-    metrics.last_trade = std::chrono::duration_cast<market_data::Timestamp>(
-        std::chrono::high_resolution_clock::now().time_since_epoch());
+    metrics.last_trade = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 }
 
 void AdvancedPositionTracker::calculate_position_risk_metrics(PositionInfo& position) {

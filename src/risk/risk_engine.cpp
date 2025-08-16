@@ -229,7 +229,8 @@ std::vector<RiskViolation> RiskEngine::get_recent_violations(uint32_t hours) con
     std::vector<RiskViolation> recent_violations;
     for (const auto& violation : violations_) {
         // Convert violation timestamp to time_point for comparison
-        auto violation_time = std::chrono::high_resolution_clock::time_point(violation.timestamp);
+        auto violation_time = std::chrono::high_resolution_clock::time_point(
+            std::chrono::nanoseconds(violation.timestamp));
         if (violation_time >= cutoff_time) {
             recent_violations.push_back(violation);
         }
@@ -378,8 +379,8 @@ RiskEngine::RiskReport RiskEngine::generate_risk_report() const {
     report.concentration_risk = calculate_concentration_risk();
     report.correlation_risk = calculate_correlation_risk();
     report.circuit_breaker_status = circuit_breaker_active_.load();
-    report.report_time = std::chrono::duration_cast<market_data::Timestamp>(
-        std::chrono::high_resolution_clock::now().time_since_epoch());
+    report.report_time = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
     return report;
 }
@@ -463,7 +464,8 @@ void RiskEngine::cleanup_old_violations() {
                        violations_.end(),
                        [cutoff_time](const RiskViolation& v) {
                            auto violation_time =
-                               std::chrono::high_resolution_clock::time_point(v.timestamp);
+                               std::chrono::high_resolution_clock::time_point(
+                                   std::chrono::nanoseconds(v.timestamp));
                            return violation_time < cutoff_time;
                        }),
         violations_.end());

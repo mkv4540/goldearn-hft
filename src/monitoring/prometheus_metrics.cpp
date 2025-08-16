@@ -428,9 +428,9 @@ double HFTMetricsCollector::get_current_memory_usage() {
             
             while (std::getline(meminfo, line)) {
                 if (line.find("MemTotal:") == 0) {
-                    sscanf(line.c_str(), "MemTotal: %lu kB", &total_mem);
+                    sscanf(line.c_str(), "MemTotal: %llu kB", &total_mem);
                 } else if (line.find("MemAvailable:") == 0) {
-                    sscanf(line.c_str(), "MemAvailable: %lu kB", &available_mem);
+                    sscanf(line.c_str(), "MemAvailable: %llu kB", &available_mem);
                 }
                 
                 if (total_mem > 0 && available_mem > 0) {
