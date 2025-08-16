@@ -116,8 +116,9 @@ void OrderBook::update_quote(const QuoteMessage& quote) {
     bid_quantity_.store(quote.bid_quantity);
     ask_quantity_.store(quote.ask_quantity);
 
-    // Update depth levels
-    for (size_t i = 0; i < MAX_DEPTH; ++i) {
+    // Update depth levels (QuoteMessage has 5 levels, so limit to that)
+    constexpr size_t QUOTE_LEVELS = 5;
+    for (size_t i = 0; i < std::min(QUOTE_LEVELS, MAX_DEPTH); ++i) {
         if (quote.bid_levels[i].price > 0) {
             bid_levels_[i] = PriceLevel{quote.bid_levels[i].price,
                                         quote.bid_levels[i].quantity,
@@ -126,7 +127,7 @@ void OrderBook::update_quote(const QuoteMessage& quote) {
         }
     }
 
-    for (size_t i = 0; i < MAX_DEPTH; ++i) {
+    for (size_t i = 0; i < std::min(QUOTE_LEVELS, MAX_DEPTH); ++i) {
         if (quote.ask_levels[i].price > 0) {
             ask_levels_[i] = PriceLevel{quote.ask_levels[i].price,
                                         quote.ask_levels[i].quantity,

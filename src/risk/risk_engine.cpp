@@ -751,8 +751,8 @@ VaRCalculator::decompose_portfolio_risk(
     const std::unordered_map<std::pair<uint64_t, uint64_t>, double, PairHash>& correlations) const {
     std::unordered_map<uint64_t, RiskDecomposition> decomposition;
 
-    double portfolio_var = calculate_parametric_var(positions, volatilities, correlations);
     auto component_vars = calculate_component_var(positions, volatilities, correlations);
+    (void)calculate_parametric_var(positions, volatilities, correlations);  // Used for validation
 
     for (const auto& [symbol_id, position] : positions) {
         RiskDecomposition risk_decomp;

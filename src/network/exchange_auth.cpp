@@ -371,7 +371,6 @@ bool ExchangeAuthenticator::make_auth_request(const std::string& url, const std:
         }
         
         // Receive response
-        uint8_t buffer[4096];
         std::ostringstream response_stream;
         
         while (true) {
