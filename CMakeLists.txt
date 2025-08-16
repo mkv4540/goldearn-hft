@@ -17,10 +17,7 @@ option(ENABLE_PRECOMPILED_HEADERS "Enable precompiled headers" ON)
 
 # Enable parallel compilation by default
 if(ENABLE_PARALLEL_BUILD)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -j$(nproc)")
-    endif()
-    # Set parallel build jobs for make
+    # Set parallel build jobs for make/ninja
     set(CMAKE_BUILD_PARALLEL_LEVEL 0)  # Use all available cores
     # Enable faster linking
     if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_BUILD_TYPE STREQUAL "Release")
