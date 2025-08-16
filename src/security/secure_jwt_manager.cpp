@@ -1,9 +1,12 @@
 #include "secure_jwt_manager.hpp"
-#include "../utils/simple_logger.hpp"
+
 #include <openssl/rand.h>
-#include <sstream>
-#include <iomanip>
+
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
+
+#include "../utils/simple_logger.hpp"
 
 namespace goldearn::security {
 
@@ -12,24 +15,25 @@ SecureJWTManager::SecureJWTManager() {
     unsigned char key_bytes[SIGNING_KEY_LENGTH];
     if (RAND_bytes(key_bytes, sizeof(key_bytes)) != 1) {
         LOG_CRITICAL("SecureJWTManager: FATAL - Failed to generate JWT signing key");
-        throw std::runtime_error("Failed to generate secure JWT signing key - cannot start authentication system");
+        throw std::runtime_error(
+            "Failed to generate secure JWT signing key - cannot start authentication system");
     }
-    
+
     std::ostringstream ss;
     for (size_t i = 0; i < SIGNING_KEY_LENGTH; ++i) {
         ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(key_bytes[i]);
     }
     signing_key_ = ss.str();
-    
+
     // Verify key was generated properly
     if (signing_key_.length() != SIGNING_KEY_LENGTH * 2) {
         LOG_CRITICAL("SecureJWTManager: FATAL - JWT signing key generation failed");
         throw std::runtime_error("JWT signing key generation failed - invalid key length");
     }
-    
-    algorithm_ = "HS256"; // Default to HMAC SHA-256
+
+    algorithm_ = "HS256";  // Default to HMAC SHA-256
     last_key_rotation_ = std::chrono::system_clock::now();
-    
+
     LOG_INFO("SecureJWTManager: Initialized with secure signing key (version {})", key_version_);
 }
 
@@ -39,28 +43,28 @@ SecureJWTManager::~SecureJWTManager() {
 }
 
 std::string SecureJWTManager::generate_token(const std::string& user_id,
-                                           const std::string& role,
-                                           std::chrono::seconds expiry) {
+                                             const std::string& role,
+                                             std::chrono::seconds expiry) {
     try {
         auto now = std::chrono::system_clock::now();
         auto exp_time = now + expiry;
         std::string jwt_id = generate_jwt_id();
-        
+
         auto token = jwt::create()
-            .set_issuer("goldearn-hft")
-            .set_type("JWT")
-            .set_payload_claim("jti", jwt_id)
-            .set_payload_claim("user_id", user_id)
-            .set_payload_claim("role", role)
-            .set_payload_claim("key_version", std::to_string(key_version_))
-            .set_payload_claim("token_type", "access")
-            .set_issued_at(now)
-            .set_expires_at(exp_time)
-            .sign(jwt::algorithm::hs256{signing_key_});
-        
+                         .set_issuer("goldearn-hft")
+                         .set_type("JWT")
+                         .set_payload_claim("jti", jwt_id)
+                         .set_payload_claim("user_id", user_id)
+                         .set_payload_claim("role", role)
+                         .set_payload_claim("key_version", std::to_string(key_version_))
+                         .set_payload_claim("token_type", "access")
+                         .set_issued_at(now)
+                         .set_expires_at(exp_time)
+                         .sign(jwt::algorithm::hs256{signing_key_});
+
         LOG_DEBUG("SecureJWTManager: Generated token for user: {} with role: {}", user_id, role);
         return token;
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Token generation failed: {}", e.what());
         throw std::runtime_error("JWT token generation failed: " + std::string(e.what()));
@@ -68,25 +72,25 @@ std::string SecureJWTManager::generate_token(const std::string& user_id,
 }
 
 std::string SecureJWTManager::generate_refresh_token(const std::string& user_id,
-                                                   std::chrono::seconds expiry) {
+                                                     std::chrono::seconds expiry) {
     try {
         auto now = std::chrono::system_clock::now();
         auto exp_time = now + expiry;
         std::string jwt_id = generate_jwt_id();
-        
+
         auto token = jwt::create()
-            .set_issuer("goldearn-hft")
-            .set_type("refresh")
-            .set_payload_claim("jti", jwt_id)
-            .set_payload_claim("user_id", user_id)
-            .set_payload_claim("token_type", "refresh")
-            .set_issued_at(now)
-            .set_expires_at(exp_time)
-            .sign(jwt::algorithm::hs256{signing_key_});
-        
+                         .set_issuer("goldearn-hft")
+                         .set_type("refresh")
+                         .set_payload_claim("jti", jwt_id)
+                         .set_payload_claim("user_id", user_id)
+                         .set_payload_claim("token_type", "refresh")
+                         .set_issued_at(now)
+                         .set_expires_at(exp_time)
+                         .sign(jwt::algorithm::hs256{signing_key_});
+
         LOG_DEBUG("SecureJWTManager: Generated refresh token for user: {}", user_id);
         return token;
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Refresh token generation failed: {}", e.what());
         throw std::runtime_error("JWT refresh token generation failed: " + std::string(e.what()));
@@ -97,39 +101,39 @@ bool SecureJWTManager::validate_token(const std::string& token) {
     try {
         auto verifier = create_verifier();
         auto decoded = jwt::decode(token);
-        
+
         // Verify signature and claims
         verifier.verify(decoded);
-        
+
         // Verify token type
         std::string token_type = decoded.get_payload_claim("token_type").as_string();
         if (token_type != "access" && token_type != "refresh") {
             LOG_ERROR("SecureJWTManager: Invalid token type");
             return false;
         }
-        
+
         // Extract JTI for blacklist check
         std::string jti = decoded.get_payload_claim("jti").as_string();
         if (jti.empty()) {
             LOG_ERROR("SecureJWTManager: Missing JTI in token");
             return false;
         }
-        
+
         // Check blacklist
         if (is_blacklisted(jti)) {
             LOG_ERROR("SecureJWTManager: Token is blacklisted");
             return false;
         }
-        
+
         // Extract user information
         std::string user_id = decoded.get_payload_claim("user_id").as_string();
         if (user_id.empty()) {
             LOG_ERROR("SecureJWTManager: Missing user_id in token");
             return false;
         }
-        
+
         return true;
-        
+
     } catch (const jwt::error::token_verification_exception& e) {
         LOG_WARN("SecureJWTManager: Token verification failed: {}", e.what());
         return false;
@@ -139,11 +143,13 @@ bool SecureJWTManager::validate_token(const std::string& token) {
     }
 }
 
-bool SecureJWTManager::validate_token(const std::string& token, std::string& user_id, std::string& role) {
+bool SecureJWTManager::validate_token(const std::string& token,
+                                      std::string& user_id,
+                                      std::string& role) {
     if (!validate_token(token)) {
         return false;
     }
-    
+
     try {
         auto decoded = jwt::decode(token);
         // Extract user information
@@ -152,14 +158,14 @@ bool SecureJWTManager::validate_token(const std::string& token, std::string& use
             LOG_ERROR("SecureJWTManager: Missing user_id in token");
             return false;
         }
-        
+
         // Extract role if present
         if (!decoded.get_payload_claim("role").as_string().empty()) {
             role = decoded.get_payload_claim("role").as_string();
         }
-        
+
         return true;
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Error extracting user info from token: {}", e.what());
         return false;
@@ -172,27 +178,27 @@ std::string SecureJWTManager::refresh_access_token(const std::string& refresh_to
         auto verifier = create_verifier();
         auto decoded = jwt::decode(refresh_token);
         verifier.verify(decoded);
-        
+
         // Check if it's actually a refresh token
         std::string token_type = decoded.get_payload_claim("token_type").as_string();
         if (token_type != "refresh") {
             LOG_WARN("SecureJWTManager: Invalid refresh token type");
             return "";
         }
-        
+
         // Check blacklist
         std::string jti = decoded.get_payload_claim("jti").as_string();
         if (is_blacklisted(jti)) {
             LOG_WARN("SecureJWTManager: Attempted to use blacklisted refresh token: {}", jti);
             return "";
         }
-        
+
         // Extract user information
         std::string user_id = decoded.get_payload_claim("user_id").as_string();
-        
+
         // Generate new access token (1 hour expiry)
         return generate_token(user_id, "user", std::chrono::hours(1));
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Refresh token validation failed: {}", e.what());
         return "";
@@ -203,10 +209,10 @@ void SecureJWTManager::revoke_token(const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
         std::string jti = decoded.get_payload_claim("jti").as_string();
-        
+
         add_to_blacklist(jti);
         LOG_INFO("SecureJWTManager: Revoked token: {}", jti);
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Error revoking token: {}", e.what());
     }
@@ -227,23 +233,23 @@ void SecureJWTManager::rotate_signing_key() {
             LOG_ERROR("SecureJWTManager: Failed to generate new signing key during rotation");
             return;
         }
-        
+
         // Securely clear old key
         std::fill(signing_key_.begin(), signing_key_.end(), '\0');
-        
+
         // Set new key
         std::ostringstream ss;
         for (size_t i = 0; i < SIGNING_KEY_LENGTH; ++i) {
             ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(key_bytes[i]);
         }
         signing_key_ = ss.str();
-        
+
         // Increment version
         key_version_++;
         last_key_rotation_ = std::chrono::system_clock::now();
-        
+
         LOG_INFO("SecureJWTManager: Signing key rotated to version {}", key_version_);
-        
+
     } catch (const std::exception& e) {
         LOG_ERROR("SecureJWTManager: Key rotation failed: {}", e.what());
     }
@@ -280,7 +286,8 @@ std::string SecureJWTManager::get_user_role(const std::string& token) {
     }
 }
 
-std::chrono::system_clock::time_point SecureJWTManager::get_expiry_from_token(const std::string& token) {
+std::chrono::system_clock::time_point SecureJWTManager::get_expiry_from_token(
+    const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
         return decoded.get_expires_at();
@@ -290,14 +297,15 @@ std::chrono::system_clock::time_point SecureJWTManager::get_expiry_from_token(co
     }
 }
 
-std::chrono::system_clock::time_point SecureJWTManager::get_expiration_time(const std::string& token) {
+std::chrono::system_clock::time_point SecureJWTManager::get_expiration_time(
+    const std::string& token) {
     try {
         auto decoded = jwt::decode(token);
         auto exp_claim = decoded.get_payload_claim("exp");
         if (exp_claim.empty()) {
             return std::chrono::system_clock::time_point{};
         }
-        
+
         // Convert from timestamp to time_point
         auto exp_time = std::chrono::system_clock::from_time_t(exp_claim.as_int());
         return exp_time;
@@ -333,12 +341,12 @@ std::string SecureJWTManager::generate_jwt_id() {
         LOG_ERROR("SecureJWTManager: Failed to generate JWT ID");
         throw std::runtime_error("Failed to generate JWT ID");
     }
-    
+
     std::ostringstream ss;
     for (int i = 0; i < 16; ++i) {
         ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(id_bytes[i]);
     }
-    
+
     return ss.str();
 }
 
@@ -355,7 +363,6 @@ jwt::verifier<jwt::default_clock> SecureJWTManager::create_verifier() {
 // JWT Middleware Implementation
 JWTAuthMiddleware::JWTAuthMiddleware(std::shared_ptr<SecureJWTManager> jwt_manager)
     : jwt_manager_(jwt_manager) {
-    
     // Set up default permissions
     add_permission_rule("admin", "*", "*");  // Admin can do everything
     add_permission_rule("user", "health", "read");
@@ -365,13 +372,13 @@ JWTAuthMiddleware::JWTAuthMiddleware(std::shared_ptr<SecureJWTManager> jwt_manag
 }
 
 bool JWTAuthMiddleware::authenticate_request(const std::string& authorization_header,
-                                           std::string& user_id, 
-                                           std::string& role) {
+                                             std::string& user_id,
+                                             std::string& role) {
     std::string token = extract_bearer_token(authorization_header);
     if (token.empty()) {
         return false;
     }
-    
+
     return jwt_manager_->validate_token(token, user_id, role);
 }
 
@@ -384,15 +391,16 @@ std::string JWTAuthMiddleware::extract_bearer_token(const std::string& authoriza
     return "";
 }
 
-bool JWTAuthMiddleware::check_permission(const std::string& role, const std::string& resource,
-                                       const std::string& action) {
+bool JWTAuthMiddleware::check_permission(const std::string& role,
+                                         const std::string& resource,
+                                         const std::string& action) {
     std::lock_guard<std::mutex> lock(permissions_mutex_);
-    
+
     auto role_it = permissions_.find(role);
     if (role_it == permissions_.end()) {
         return false;
     }
-    
+
     // Check wildcard permissions
     auto wildcard_it = role_it->second.find("*");
     if (wildcard_it != role_it->second.end()) {
@@ -401,21 +409,22 @@ bool JWTAuthMiddleware::check_permission(const std::string& role, const std::str
             return true;
         }
     }
-    
+
     // Check specific resource permissions
     auto resource_it = role_it->second.find(resource);
     if (resource_it != role_it->second.end()) {
         auto& actions = resource_it->second;
         return actions.find("*") != actions.end() || actions.find(action) != actions.end();
     }
-    
+
     return false;
 }
 
-void JWTAuthMiddleware::add_permission_rule(const std::string& role, const std::string& resource,
-                                          const std::string& action) {
+void JWTAuthMiddleware::add_permission_rule(const std::string& role,
+                                            const std::string& resource,
+                                            const std::string& action) {
     std::lock_guard<std::mutex> lock(permissions_mutex_);
     permissions_[role][resource].insert(action);
 }
 
-} // namespace goldearn::security
+}  // namespace goldearn::security

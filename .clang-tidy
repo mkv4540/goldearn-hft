@@ -1,0 +1,47 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  bugprone-*,
+  -modernize-use-trailing-return-type,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  -cppcoreguidelines-pro-type-vararg,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -readability-function-cognitive-complexity,
+  -bugprone-easily-swappable-parameters,
+  -modernize-use-auto,
+  -readability-identifier-length
+WarningsAsErrors: false
+HeaderFilterRegex: '.*src/.*'
+AnalyzeTemporaryDtors: false
+FormatStyle: file
+CheckOptions:
+  - { key: readability-identifier-naming.NamespaceCase,          value: lower_case }
+  - { key: readability-identifier-naming.ClassCase,             value: CamelCase  }
+  - { key: readability-identifier-naming.StructCase,            value: CamelCase  }
+  - { key: readability-identifier-naming.FunctionCase,          value: lower_case }
+  - { key: readability-identifier-naming.VariableCase,          value: lower_case }
+  - { key: readability-identifier-naming.PrivateMemberSuffix,   value: _          }
+  - { key: readability-identifier-naming.ProtectedMemberSuffix, value: _          }
+  - { key: readability-identifier-naming.MacroCase,            value: UPPER_CASE }
+  - { key: readability-identifier-naming.EnumConstantCase,     value: kCamelCase }
+  - { key: readability-identifier-naming.EnumConstantPrefix,   value: k          }
+  - { key: readability-identifier-naming.ConstantCase,         value: kCamelCase }
+  - { key: readability-identifier-naming.ConstantPrefix,       value: k          }
+  - { key: readability-identifier-naming.GlobalConstantCase,   value: kCamelCase }
+  - { key: readability-identifier-naming.GlobalConstantPrefix, value: k          }
+  - { key: readability-function-size.LineThreshold,           value: 150        }
+  - { key: readability-function-size.StatementThreshold,      value: 100        }
+  - { key: readability-function-size.BranchThreshold,         value: 20         }
+  - { key: readability-function-size.ParameterThreshold,      value: 10         }
+  - { key: performance-move-const-arg.CheckTriviallyCopyableMove, value: false   }
+  - { key: modernize-loop-convert.MaxCopySize,                value: 32         }
+  - { key: modernize-loop-convert.MinConfidence,              value: reasonable }
+  - { key: modernize-loop-convert.NamingStyle,                value: lower_case }
+  - { key: modernize-pass-by-value.IncludeStyle,              value: llvm       }
+  - { key: modernize-replace-auto-ptr.IncludeStyle,           value: llvm       }

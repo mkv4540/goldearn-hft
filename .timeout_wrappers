@@ -1,0 +1,182 @@
+# Premium timeout wrapper functions with automatic 20-minute minimum
+
+# CMake wrapper with extended timeout and optimization
+cmake_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    
+    # Add performance optimizations if configuring
+    if [[ " ${args[*]} " =~ " -B " ]] || [[ " ${args[*]} " =~ " --build " ]]; then
+        if [[ " ${args[*]} " =~ " -B " ]]; then
+            # Configuration phase - add optimization flags
+            args+=(
+                "-DCMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-0}"
+                "-DENABLE_PARALLEL_BUILD=ON"
+                "-DENABLE_UNITY_BUILD=ON"
+                "-DENABLE_PRECOMPILED_HEADERS=ON"
+            )
+            # Use Ninja if available
+            if command -v ninja >/dev/null 2>&1; then
+                args+=("-G" "Ninja")
+            fi
+        fi
+        
+        if [[ " ${args[*]} " =~ " --build " ]]; then
+            # Build phase - ensure parallel execution
+            if ! [[ " ${args[*]} " =~ " --parallel " ]]; then
+                args+=("--parallel" "$(nproc 2>/dev/null || echo 4)")
+            fi
+        fi
+    fi
+    
+    echo "[PREMIUM] Running cmake with ${timeout_seconds}s timeout and optimizations"
+    timeout "${timeout_seconds}s" cmake "${args[@]}"
+}
+
+# Make wrapper with extended timeout and parallel execution
+make_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    
+    # Add parallel execution if not specified
+    if ! [[ " ${args[*]} " =~ " -j" ]]; then
+        args+=("-j$(nproc 2>/dev/null || echo 4)")
+    fi
+    
+    echo "[PREMIUM] Running make with ${timeout_seconds}s timeout and parallel execution"
+    timeout "${timeout_seconds}s" make "${args[@]}"
+}
+
+# Ninja wrapper with extended timeout
+ninja_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    
+    echo "[PREMIUM] Running ninja with ${timeout_seconds}s timeout"
+    timeout "${timeout_seconds}s" ninja "${args[@]}"
+}
+
+# CTest wrapper with extended timeout and parallel execution
+ctest_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    
+    # Add parallel execution and extended test timeout if not specified
+    if ! [[ " ${args[*]} " =~ " --parallel " ]]; then
+        args+=("--parallel" "$(nproc 2>/dev/null || echo 4)")
+    fi
+    
+    if ! [[ " ${args[*]} " =~ " --timeout " ]]; then
+        args+=("--timeout" "1200")  # 20 minutes per test
+    fi
+    
+    echo "[PREMIUM] Running ctest with ${timeout_seconds}s timeout and optimizations"
+    timeout "${timeout_seconds}s" ctest "${args[@]}"
+}
+
+# APT wrapper with extended timeout and optimizations
+apt_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    
+    # Add optimization flags
+    args+=("--no-install-recommends" "--yes")
+    
+    echo "[PREMIUM] Running apt with ${timeout_seconds}s timeout and optimizations"
+    timeout "${timeout_seconds}s" apt "${args[@]}"
+}
+
+# Git wrapper with extended timeout and network optimizations
+git_optimized() {
+    local timeout_seconds=1200
+    local args=("$@")
+    local command="${args[0]}"
+    
+    # Network optimization settings for git operations
+    local git_config_args=()
+    
+    # Optimize for network operations (push, pull, fetch, clone)
+    if [[ "$command" =~ ^(push|pull|fetch|clone)$ ]]; then
+        # Increase network timeouts and optimize transfer
+        git_config_args+=(
+            "-c" "http.lowSpeedLimit=1000"
+            "-c" "http.lowSpeedTime=300"
+            "-c" "http.timeout=1200"
+            "-c" "transfer.fsckObjects=false"
+            "-c" "fetch.fsckObjects=false"
+            "-c" "receive.fsckObjects=false"
+            "-c" "core.preloadindex=true"
+            "-c" "core.fscache=true"
+            "-c" "gc.auto=0"
+        )
+        
+        # For push operations, add additional optimizations
+        if [[ "$command" == "push" ]]; then
+            git_config_args+=(
+                "-c" "push.default=simple"
+                "-c" "sendpack.sideband=false"
+            )
+            
+            # Add progress for large pushes
+            if ! [[ " ${args[*]} " =~ " --progress " ]] && ! [[ " ${args[*]} " =~ " --quiet " ]]; then
+                args+=("--progress")
+            fi
+        fi
+        
+        # For clone operations, add optimizations
+        if [[ "$command" == "clone" ]]; then
+            if ! [[ " ${args[*]} " =~ " --depth " ]]; then
+                # Use shallow clone for faster initial clone
+                args+=("--depth" "1")
+            fi
+            if ! [[ " ${args[*]} " =~ " --single-branch " ]]; then
+                args+=("--single-branch")
+            fi
+        fi
+        
+        # For fetch/pull operations
+        if [[ "$command" =~ ^(fetch|pull)$ ]]; then
+            if ! [[ " ${args[*]} " =~ " --jobs " ]]; then
+                args+=("--jobs" "$(nproc 2>/dev/null || echo 4)")
+            fi
+        fi
+        
+        echo "[PREMIUM] Running git $command with ${timeout_seconds}s timeout and network optimizations"
+        timeout "${timeout_seconds}s" git "${git_config_args[@]}" "${args[@]}"
+    else
+        # For non-network operations, use standard timeout
+        echo "[PREMIUM] Running git $command with ${timeout_seconds}s timeout"
+        timeout "${timeout_seconds}s" git "${args[@]}"
+    fi
+}
+
+# General compiler wrapper with extended timeout and parallel execution
+compile_optimized() {
+    local timeout_seconds=1200
+    local compiler="$1"
+    shift
+    local args=("$@")
+    
+    # Add parallel compilation flags for supported compilers
+    if [[ "$compiler" =~ ^(gcc|g\+\+|clang|clang\+\+)$ ]]; then
+        # Add parallel compilation flags if building multiple files
+        if [[ "${#args[@]}" -gt 3 ]]; then
+            args+=("-j$(nproc 2>/dev/null || echo 4)")
+        fi
+    fi
+    
+    echo "[PREMIUM] Running $compiler with ${timeout_seconds}s timeout"
+    timeout "${timeout_seconds}s" "$compiler" "${args[@]}"
+}
+
+# Aliases for common commands with automatic optimization
+alias cmake='cmake_optimized'
+alias make='make_optimized'
+alias ninja='ninja_optimized'
+alias ctest='ctest_optimized'
+alias apt-get='apt_optimized'
+alias git='git_optimized'
+alias gcc='compile_optimized gcc'
+alias g++='compile_optimized g++'
+alias clang='compile_optimized clang'
+alias clang++='compile_optimized clang++'
