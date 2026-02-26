@@ -1,0 +1,22 @@
+name: Protect Main Branch
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  block-direct-push:
+    name: "CI - Block direct push, allow PRs"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Block direct push to main/master"
+        if: github.event_name == 'push'
+        run: |
+          echo "Direct pushes to main/master are NOT allowed."
+          echo "Create a feature branch and open a Pull Request."
+          exit 1
+      - name: "PR merge allowed"
+        if: github.event_name == 'pull_request'
+        run: echo "PR-based merge detected - OK."
