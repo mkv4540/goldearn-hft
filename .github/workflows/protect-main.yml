@@ -8,15 +8,16 @@ on:
 
 jobs:
   block-direct-push:
-    name: "CI - Block direct push, allow PRs"
     runs-on: ubuntu-latest
     steps:
-      - name: "Block direct push to main/master"
+      - name: Block direct push to main
         if: github.event_name == 'push'
         run: |
-          echo "Direct pushes to main/master are NOT allowed."
-          echo "Create a feature branch and open a Pull Request."
+          echo " Direct pushes to main/master are NOT allowed!"
+          echo "Please create a feature branch and open a Pull Request."
           exit 1
-      - name: "PR merge allowed"
+
+      - name: PR check passed
         if: github.event_name == 'pull_request'
-        run: echo "PR-based merge detected - OK."
+        run: |
+          echo " PR-based merge detected. Proceeding."
