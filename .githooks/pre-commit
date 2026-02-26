@@ -1,0 +1,25 @@
+#!/bin/sh
+# ============================================================
+#  PRE-COMMIT HOOK — Blocks commits directly on main / master
+# ============================================================
+branch=$(git symbolic-ref HEAD 2>/dev/null | sed 's|refs/heads/||')
+
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo ""
+  echo "  ╔══════════════════════════════════════════════════════╗"
+  echo "  ║   🚫  COMMITTING DIRECTLY TO '$branch' NOT ALLOWED!  ║"
+  echo "  ╠══════════════════════════════════════════════════════╣"
+  echo "  ║  You are on the protected branch: $branch             ║"
+  echo "  ║                                                      ║"
+  echo "  ║  Please switch to a feature branch first:            ║"
+  echo "  ║     git checkout -b feature/your-feature-name        ║"
+  echo "  ║     git add .                                         ║"
+  echo "  ║     git commit -m 'your message'                     ║"
+  echo "  ║     git push origin feature/your-feature-name        ║"
+  echo "  ║     Then open a Pull Request on GitHub.              ║"
+  echo "  ╚══════════════════════════════════════════════════════╝"
+  echo ""
+  exit 1
+fi
+
+exit 0
