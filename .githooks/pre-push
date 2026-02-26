@@ -1,0 +1,31 @@
+#!/bin/sh
+# ============================================================
+#  PRE-PUSH HOOK — Blocks direct push to main / master
+# ============================================================
+protected_branch="main master"
+
+while read local_ref local_sha remote_ref remote_sha; do
+  branch=$(echo "$remote_ref" | sed 's|refs/heads/||')
+  for pb in $protected_branch; do
+    if [ "$branch" = "$pb" ]; then
+      echo ""
+      echo "  ╔══════════════════════════════════════════════════════╗"
+      echo "  ║   🚫  DIRECT PUSH TO '$branch' IS NOT ALLOWED!       ║"
+      echo "  ╠══════════════════════════════════════════════════════╣"
+      echo "  ║  Please follow the correct workflow:                 ║"
+      echo "  ║                                                      ║"
+      echo "  ║  1. Create a feature branch:                         ║"
+      echo "  ║     git checkout -b feature/your-feature-name        ║"
+      echo "  ║                                                      ║"
+      echo "  ║  2. Push the feature branch:                         ║"
+      echo "  ║     git push origin feature/your-feature-name        ║"
+      echo "  ║                                                      ║"
+      echo "  ║  3. Open a Pull Request on GitHub.                   ║"
+      echo "  ╚══════════════════════════════════════════════════════╝"
+      echo ""
+      exit 1
+    fi
+  done
+done
+
+exit 0
