@@ -9,7 +9,7 @@ on:
 jobs:
   lint:
     name: Code Quality Check
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 20
 
     steps:
@@ -33,7 +33,7 @@ jobs:
         run: |
           echo "Checking code formatting..."
           find src tests -name "*.cpp" -o -name "*.hpp" -o -name "*.h" | \
-          xargs clang-format-15 --dry-run --Werror || echo "⚠️ Code formatting issues found but continuing..."
+          xargs clang-format-15 --dry-run --Werror || echo "â ï¸ Code formatting issues found but continuing..."
 
       - name: Create simple CMakeLists.txt for linting
         run: |
@@ -77,15 +77,15 @@ jobs:
 
       - name: Build for analysis
         run: |
-          cmake --build build --parallel 2 || echo "⚠️ Build issues found but continuing..."
+          cmake --build build --parallel 2 || echo "â ï¸ Build issues found but continuing..."
 
       - name: Run clang-tidy
         run: |
           echo "Running clang-tidy analysis..."
-          find src -name "*.cpp" | head -5 | xargs clang-tidy-15 -p build 2>/dev/null || echo "⚠️ Static analysis issues found but continuing..."
+          find src -name "*.cpp" | head -5 | xargs clang-tidy-15 -p build 2>/dev/null || echo "â ï¸ Static analysis issues found but continuing..."
 
       - name: Run cppcheck
         run: |
           echo "Running cppcheck analysis..."
           cppcheck --enable=all --std=c++20 --suppress=missingIncludeSystem \
-            --suppress=unusedFunction --error-exitcode=0 src/ || echo "⚠️ Cppcheck found issues but continuing..."
+            --suppress=unusedFunction --error-exitcode=0 src/ || echo "â ï¸ Cppcheck found issues but continuing..."
