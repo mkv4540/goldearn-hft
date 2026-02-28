@@ -9,7 +9,7 @@ on:
 jobs:
   dependency-audit:
     name: Security & Dependency Audit
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 20
     
     steps:
@@ -38,17 +38,17 @@ jobs:
           echo "Checking for common security vulnerabilities..."
           # Check for buffer overflows patterns
           if grep -r "strcpy\|strcat\|sprintf\|gets" src/; then
-            echo "⚠️  Warning: Found potentially unsafe string functions"
+            echo "â ï¸  Warning: Found potentially unsafe string functions"
           fi
           
           # Check for hardcoded credentials patterns
           if grep -ri "password\|secret\|key.*=" src/ --exclude-dir=tests; then
-            echo "⚠️  Warning: Possible hardcoded credentials found"
+            echo "â ï¸  Warning: Possible hardcoded credentials found"
           fi
           
           # Check for SQL injection patterns  
           if grep -r "SELECT.*+\|INSERT.*+\|UPDATE.*+" src/; then
-            echo "⚠️  Warning: Possible SQL injection vulnerability"
+            echo "â ï¸  Warning: Possible SQL injection vulnerability"
           fi
 
       - name: Upload security report
